@@ -9,8 +9,7 @@ async fn spawn_app() -> String {
     let db_connection = PgConnection::connect(&conn_string)
         .await
         .expect("Database connection failed.");
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .expect("Failed to bind test port");
+    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind test port");
     let port = listener.local_addr().unwrap().port();
     let app = run(listener, db_connection).expect("Failed to spawn server");
     let _ = tokio::spawn(app);
