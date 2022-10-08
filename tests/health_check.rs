@@ -3,10 +3,16 @@ use std::net::TcpListener;
 use zero2prod::configuration::get_configuration;
 use zero2prod::startup::run;
 
-fn spawn_app() -> String {
-    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind test port");
+async fn spawn_app() -> String {
+    let configuration = get_configuration().expect("Failed to get Configuration");
+    let conn_string = configuration.database.get_connection_string();
+    let db_connection = PgConnection::connect(&conn_string)
+        .await
+        .expect("Database connection failed.");
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .expect("Failed to bind test port");
     let port = listener.local_addr().unwrap().port();
-    let app = run(listener).expect("Failed to spawn server");
+    let app = run(listener, db_connection).expect("Failed to spawn server");
     let _ = tokio::spawn(app);
     format!("http://127.0.0.1:{}", port)
 }
@@ -15,7 +21,7 @@ fn spawn_app() -> String {
 async fn health_check_works() {
     // Arrange
     // Spawn the web server.
-    let app_addr = spawn_app();
+    let app_addr = spawn_app().await;
     // reqwest is needed to comunicate with the server we spawned.
     let client = reqwest::Client::new();
 
@@ -34,7 +40,7 @@ async fn health_check_works() {
 #[tokio::test]
 async fn form_post_request_operates_correctly() {
     //Arrange
-    let app_addr = spawn_app();
+    let app_addr = spawn_app().await;
     let configuration = get_configuration().expect("Failed to get Configuration");
     let conn_string = configuration.database.get_connection_string();
     let mut db_connection = PgConnection::connect(&conn_string)
@@ -65,7 +71,7 @@ async fn form_post_request_operates_correctly() {
 #[tokio::test]
 async fn form_post_fails_correctly_with_missing_data() {
     //Arrange
-    let app_addr = spawn_app();
+    let app_addr = spawn_app().await;
     let client = reqwest::Client::new();
     let bad_requests = vec![
         ("email=test@example.com", "Missing Name"),
