@@ -3,6 +3,7 @@ use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use std::net::TcpListener;
 
 #[derive(serde::Deserialize)]
+#[allow(dead_code)]
 struct FormData {
     email: String,
     name: String,
@@ -17,6 +18,7 @@ async fn health_check() -> impl Responder {
     HttpResponse::Ok()
 }
 
+#[allow(dead_code, unused_variables)]
 async fn handle_subscribe(form: web::Form<FormData>) -> impl Responder {
     HttpResponse::Ok()
 }
