@@ -13,7 +13,7 @@ pub async fn handle_subscribe(
     db_connection: web::Data<sqlx::PgPool>,
 ) -> impl Responder {
     let request_id = Uuid::new_v4();
-    log::info!("{} || Beginning subscription of new user {} with email {}", request_id, form.name, form.email);
+    tracing::info!("{} || Beginning subscription of new user {} with email {}", request_id, form.name, form.email);
     let status = sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at)
@@ -28,11 +28,11 @@ pub async fn handle_subscribe(
     .await;
     match status {
         Ok(_) => {
-            log::info!("{} || Database modification successful!", request_id);
+            tracing::info!("{} || Database modification successful!", request_id);
             HttpResponse::Ok()
         },
         Err(e) => {
-            log::error!("{} || Failed to execute query: {:?}", request_id, e);
+            tracing::error!("{} || Failed to execute query: {:?}", request_id, e);
             HttpResponse::InternalServerError()
         }
     }
