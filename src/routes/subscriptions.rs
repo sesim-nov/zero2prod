@@ -10,7 +10,7 @@ pub struct FormData {
 
 pub async fn handle_subscribe(
     form: web::Form<FormData>,
-    db_connection: web::Data<sqlx::PgConnection>,
+    db_connection: web::Data<sqlx::PgPool>,
 ) -> impl Responder {
     let status = sqlx::query!(
         r#"
@@ -24,5 +24,11 @@ pub async fn handle_subscribe(
     )
     .execute(db_connection.get_ref())
     .await;
-    HttpResponse::Ok()
+    match status {
+        Ok(_) => HttpResponse::Ok(),
+        Err(e) => {
+            println!("Failed to execute query: {}", e);
+            HttpResponse::InternalServerError()
+        }
+    }
 }

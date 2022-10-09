@@ -1,10 +1,10 @@
 use crate::routes::*;
 use actix_web::dev::Server;
 use actix_web::{web, App, HttpServer};
-use sqlx::PgConnection;
+use sqlx::PgPool;
 use std::net::TcpListener;
 
-pub fn run(listener: TcpListener, db_connection: PgConnection) -> std::io::Result<Server> {
+pub fn run(listener: TcpListener, db_connection: PgPool) -> std::io::Result<Server> {
     let db_connection = web::Data::new(db_connection);
     let srv = HttpServer::new(move || {
         App::new()
