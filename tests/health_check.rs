@@ -1,6 +1,7 @@
-use sqlx::PgPool;
+use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::net::TcpListener;
-use zero2prod::configuration::get_configuration;
+use uuid::Uuid;
+use zero2prod::configuration::{get_configuration, DatabaseSettings};
 use zero2prod::startup::run;
 
 pub struct TestApp {
@@ -9,11 +10,9 @@ pub struct TestApp {
 }
 
 async fn spawn_app() -> TestApp {
-    let configuration = get_configuration().expect("Failed to get Configuration");
-    let conn_string = configuration.database.get_connection_string();
-    let db_connection = PgPool::connect(&conn_string)
-        .await
-        .expect("Database connection failed.");
+    let mut configuration = get_configuration().expect("Failed to get Configuration");
+    configuration.database.db_name = Uuid::new_v4().to_string();
+    let db_connection = configure_database(&configuration.database).await;
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind test port");
     let port = listener.local_addr().unwrap().port();
     let app = run(listener, db_connection.clone()).expect("Failed to spawn server");
@@ -22,6 +21,29 @@ async fn spawn_app() -> TestApp {
         app_address: format!("http://127.0.0.1:{}", port),
         db_pool: db_connection,
     }
+}
+
+async fn configure_database(database: &DatabaseSettings) -> PgPool {
+    // Acquire a temporary connection to the main database
+    let mut tmp_connection = PgConnection::connect(&database.get_connection_string_no_db())
+        .await
+        .expect("Temporary connection to main pg database failed.");
+    tmp_connection
+        .execute(format!(r#"CREATE DATABASE "{}";"#, database.db_name).as_str())
+        .await
+        .expect("Failed to create database");
+
+    let conn_string = database.get_connection_string();
+    let pool_out = PgPool::connect(&conn_string)
+        .await
+        .expect("Database connection failed.");
+
+    sqlx::migrate!("./migrations")
+        .run(&pool_out)
+        .await
+        .expect("Database migration failed.");
+
+    pool_out
 }
 
 #[tokio::test]
