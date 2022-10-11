@@ -23,22 +23,7 @@ pub async fn handle_subscribe(
     );
     let _guard = span.enter();
 
-    // Query!
-    let query_span = tracing::info_span!("Saving details to the database.");
-    let status = sqlx::query!(
-        r#"
-        INSERT INTO subscriptions (id, email, name, subscribed_at)
-        VALUES ($1, $2, $3, $4)
-        "#,
-        Uuid::new_v4(),
-        form.email,
-        form.name,
-        Utc::now()
-    )
-    .execute(db_connection.get_ref())
-    .instrument(query_span)
-    .await;
-    match status {
+    match db_insert_user(&form, &db_connection).await {
         Ok(_) => {
             tracing::info!("{} || Database modification successful!", request_id);
             HttpResponse::Ok()
@@ -48,4 +33,23 @@ pub async fn handle_subscribe(
             HttpResponse::InternalServerError()
         }
     }
+}
+
+async fn db_insert_user(form: &FormData, db_connection: &sqlx::PgPool) -> Result<(), sqlx::Error> {
+    // Query!
+    let query_span = tracing::info_span!("Saving details to the database.");
+    sqlx::query!(
+        r#"
+        INSERT INTO subscriptions (id, email, name, subscribed_at)
+        VALUES ($1, $2, $3, $4)
+        "#,
+        Uuid::new_v4(),
+        form.email,
+        form.name,
+        Utc::now()
+    )
+    .execute(db_connection)
+    .instrument(query_span)
+    .await?;
+    Ok(())
 }
