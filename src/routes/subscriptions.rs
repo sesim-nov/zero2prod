@@ -8,13 +8,14 @@ pub struct FormData {
     name: String,
 }
 
+#[allow(clippy::async_yields_async)]
 #[tracing::instrument(
     name = "Adding new subscriber",
     skip(form, db_connection),
     fields(
         request_id = %Uuid::new_v4(),
-        %form.name,
-        %form.email
+        name = %form.name,
+        email = %form.email
     )
 )]
 pub async fn handle_subscribe(
