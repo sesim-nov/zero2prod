@@ -3,6 +3,13 @@ use std::net::TcpListener;
 use uuid::Uuid;
 use zero2prod::configuration::{get_configuration, DatabaseSettings};
 use zero2prod::startup::run;
+use once_cell::sync::Lazy;
+use zero2prod::telemetry::{get_subscriber, init_subscriber};
+
+static SUBSCRIBER: Lazy<()> = Lazy::new(|| {
+    let subscriber = get_subscriber("Tests".into(), "debug".into());
+    init_subscriber(subscriber);
+});
 
 pub struct TestApp {
     app_address: String,
@@ -10,6 +17,7 @@ pub struct TestApp {
 }
 
 async fn spawn_app() -> TestApp {
+    Lazy::force(&SUBSCRIBER);
     let mut configuration = get_configuration().expect("Failed to get Configuration");
     configuration.database.db_name = Uuid::new_v4().to_string();
     let db_connection = configure_database(&configuration.database).await;
