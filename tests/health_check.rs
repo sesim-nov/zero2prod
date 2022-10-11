@@ -7,8 +7,15 @@ use zero2prod::startup::run;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
 static SUBSCRIBER: Lazy<()> = Lazy::new(|| {
-    let subscriber = get_subscriber("Tests".into(), "debug".into());
-    init_subscriber(subscriber);
+    let name = "Testing".into();
+    let level = "debug".into();
+    if std::env::var("TEST_LOG").is_ok() {
+        let subscriber = get_subscriber(name, level, std::io::stdout);
+        init_subscriber(subscriber);
+    } else {
+        let subscriber = get_subscriber(name, level, std::io::sink);
+        init_subscriber(subscriber);
+    };
 });
 
 pub struct TestApp {
@@ -17,12 +24,19 @@ pub struct TestApp {
 }
 
 async fn spawn_app() -> TestApp {
+    // Setup Telemetry (once.)
     Lazy::force(&SUBSCRIBER);
+
+    // Read configuration
     let mut configuration = get_configuration().expect("Failed to get Configuration");
     configuration.database.db_name = Uuid::new_v4().to_string();
+
+    // Connect to db
     let db_connection = configure_database(&configuration.database).await;
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind test port");
     let port = listener.local_addr().unwrap().port();
+
+    // Spawn app
     let app = run(listener, db_connection.clone()).expect("Failed to spawn server");
     let _ = tokio::spawn(app);
     TestApp {
