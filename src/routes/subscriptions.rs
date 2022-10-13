@@ -8,11 +8,35 @@ pub struct FormData {
     name: String,
 }
 
+#[allow(clippy::async_yields_async)]
+#[tracing::instrument(
+    name = "Adding new subscriber",
+    skip(form, db_connection),
+    fields(
+        name = %form.name,
+        email = %form.email
+    )
+)]
 pub async fn handle_subscribe(
     form: web::Form<FormData>,
     db_connection: web::Data<sqlx::PgPool>,
 ) -> impl Responder {
-    let status = sqlx::query!(
+    match db_insert_user(&form, &db_connection).await {
+        Ok(_) => {
+            tracing::info!("Database modification successful!");
+            HttpResponse::Ok()
+        }
+        Err(e) => {
+            tracing::error!("Failed to execute query: {:?}", e);
+            HttpResponse::InternalServerError()
+        }
+    }
+}
+
+#[tracing::instrument(name = "Adding user to database", skip(form, db_connection))]
+async fn db_insert_user(form: &FormData, db_connection: &sqlx::PgPool) -> Result<(), sqlx::Error> {
+    // Query!
+    sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at)
         VALUES ($1, $2, $3, $4)
@@ -22,13 +46,7 @@ pub async fn handle_subscribe(
         form.name,
         Utc::now()
     )
-    .execute(db_connection.get_ref())
-    .await;
-    match status {
-        Ok(_) => HttpResponse::Ok(),
-        Err(e) => {
-            println!("Failed to execute query: {}", e);
-            HttpResponse::InternalServerError()
-        }
-    }
+    .execute(db_connection)
+    .await?;
+    Ok(())
 }
