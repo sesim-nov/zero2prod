@@ -50,11 +50,10 @@ impl DatabaseSettings {
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {
     // Parse Environment
     let run_type: RunType = std::env::var("RUN_TYPE")
-        .unwrap_or("dev".into())
+        .unwrap_or_else(|_| "dev".into())
         .try_into()
         .expect("Failed to parse run type env var");
-    let run_type_name: String = run_type.into();
-    let env_conf_fname = format!("config/{}.yaml", run_type_name);
+    let env_conf_fname = format!("config/{}.yaml", run_type.as_str());
     // Setup config reader.
     let settings = config::Config::builder()
         // Add config path at hard-coded config location.
@@ -76,11 +75,11 @@ enum RunType {
     Prod,
 }
 
-impl Into<String> for RunType {
-    fn into(self) -> String {
+impl RunType {
+    fn as_str(&self) -> &'static str {
         match self {
-            Self::Dev => "dev".into(),
-            Self::Prod => "prod".into(),
+            Self::Dev => "dev",
+            Self::Prod => "prod",
         }
     }
 }
