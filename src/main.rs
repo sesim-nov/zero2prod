@@ -19,7 +19,7 @@ async fn main() -> std::io::Result<()> {
             .expose_secret(),
     )
     .expect("Failed to connect to the database");
-    let address = format!("127.0.0.1:{}", configuration.app_port);
+    let address = format!("{}:{}", configuration.app.host, configuration.app.port);
     let listener = TcpListener::bind(address)?;
     run(listener, db_connection)?.await
 }

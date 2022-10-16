@@ -3,7 +3,7 @@ use secrecy::{ExposeSecret, Secret};
 #[allow(dead_code)]
 #[derive(serde::Deserialize)]
 pub struct Settings {
-    pub app_port: u16,
+    pub app: AppSettings,
     pub database: DatabaseSettings,
 }
 
@@ -13,7 +13,13 @@ pub struct DatabaseSettings {
     pub password: Secret<String>,
     pub port: u16,
     pub host: String,
-    pub db_name: String,
+    pub name: String,
+}
+
+#[derive(serde::Deserialize)]
+pub struct AppSettings {
+    pub host: String,
+    pub port: String
 }
 
 impl DatabaseSettings {
@@ -24,7 +30,7 @@ impl DatabaseSettings {
             self.password.expose_secret(),
             self.host,
             self.port,
-            self.db_name
+            self.name
         )
         .into()
     }
