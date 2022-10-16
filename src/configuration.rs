@@ -19,7 +19,7 @@ pub struct DatabaseSettings {
 #[derive(serde::Deserialize)]
 pub struct AppSettings {
     pub host: String,
-    pub port: String
+    pub port: String,
 }
 
 impl DatabaseSettings {
@@ -48,14 +48,50 @@ impl DatabaseSettings {
 }
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {
+    // Parse Environment
+    let run_type: RunType = std::env::var("RUN_TYPE")
+        .unwrap_or("dev".into())
+        .try_into()
+        .expect("Failed to parse run type env var");
+    let run_type_name: String = run_type.into();
+    let env_conf_fname = format!("config/{}.yaml", run_type_name);
     // Setup config reader.
     let settings = config::Config::builder()
         // Add config path at hard-coded config location.
         .add_source(config::File::new(
-            "configuration.yaml",
+            "config/base.yaml",
+            config::FileFormat::Yaml,
+        ))
+        .add_source(config::File::new(
+            &env_conf_fname,
             config::FileFormat::Yaml,
         ))
         .build()?;
     //Try to convert config to application config type.
     settings.try_deserialize::<Settings>()
+}
+
+enum RunType {
+    Dev,
+    Prod,
+}
+
+impl Into<String> for RunType {
+    fn into(self) -> String {
+        match self {
+            Self::Dev => "dev".into(),
+            Self::Prod => "prod".into(),
+        }
+    }
+}
+
+impl TryFrom<String> for RunType {
+    type Error = &'static str;
+    fn try_from(val: String) -> Result<Self, Self::Error> {
+        match &val[..] {
+            "dev" => Ok(Self::Dev),
+            "prod" => Ok(Self::Prod),
+            _ => Err("Failed to parse run type"),
+        }
+    }
 }
