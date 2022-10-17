@@ -11,7 +11,7 @@ pub struct Settings {
 pub struct DatabaseSettings {
     pub username: Secret<String>,
     pub password: Secret<String>,
-    pub port: u16,
+    pub port: String,
     pub host: String,
     pub name: String,
 }
