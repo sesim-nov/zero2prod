@@ -62,6 +62,11 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
             config::FileFormat::Yaml,
         ))
         .add_source(config::File::new(&env_conf_fname, config::FileFormat::Yaml))
+        .add_source(
+            config::Environment::with_prefix("APP")
+                .prefix_separator("_")
+                .separator("__"),
+        )
         .build()?;
     //Try to convert config to application config type.
     settings.try_deserialize::<Settings>()
