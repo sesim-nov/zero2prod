@@ -30,7 +30,7 @@ async fn spawn_app() -> TestApp {
 
     // Read configuration
     let mut configuration = get_configuration().expect("Failed to get Configuration");
-    configuration.database.db_name = Uuid::new_v4().to_string();
+    configuration.database.name = Uuid::new_v4().to_string();
 
     // Connect to db
     let db_connection = configure_database(&configuration.database).await;
@@ -53,7 +53,7 @@ async fn configure_database(database: &DatabaseSettings) -> PgPool {
             .await
             .expect("Temporary connection to main pg database failed.");
     tmp_connection
-        .execute(format!(r#"CREATE DATABASE "{}";"#, database.db_name).as_str())
+        .execute(format!(r#"CREATE DATABASE "{}";"#, database.name).as_str())
         .await
         .expect("Failed to create database");
 
