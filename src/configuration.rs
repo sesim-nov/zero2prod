@@ -1,5 +1,6 @@
 use secrecy::{ExposeSecret, Secret};
-use sqlx::postgres::PgConnectOptions;
+use sqlx::postgres::{PgConnectOptions, PgSslMode};
+use sqlx::ConnectOptions;
 
 #[allow(dead_code)]
 #[derive(serde::Deserialize)]
@@ -15,6 +16,7 @@ pub struct DatabaseSettings {
     pub port: String,
     pub host: String,
     pub name: String,
+    pub require_ssl: bool,
 }
 
 #[derive(serde::Deserialize)]
@@ -25,15 +27,23 @@ pub struct AppSettings {
 
 impl DatabaseSettings {
     pub fn with_db(&self) -> PgConnectOptions {
-        self.without_db().database(&self.name)
+        let mut out = self.without_db().database(&self.name);
+        out.log_statements(tracing::log::LevelFilter::Trace);
+        out
     }
 
     pub fn without_db(&self) -> PgConnectOptions {
+        let ssl_mode = if self.require_ssl {
+            PgSslMode::Require
+        } else {
+            PgSslMode::Prefer
+        };
         PgConnectOptions::new()
             .host(&self.host)
             .port(self.port.parse().unwrap())
             .username(self.username.expose_secret())
             .password(self.password.expose_secret())
+            .ssl_mode(ssl_mode)
     }
 }
 
