@@ -1,4 +1,6 @@
 use secrecy::{ExposeSecret, Secret};
+use sqlx::postgres::{PgConnectOptions, PgSslMode};
+use sqlx::ConnectOptions;
 
 #[allow(dead_code)]
 #[derive(serde::Deserialize)]
@@ -11,9 +13,10 @@ pub struct Settings {
 pub struct DatabaseSettings {
     pub username: Secret<String>,
     pub password: Secret<String>,
-    pub port: u16,
+    pub port: String,
     pub host: String,
     pub name: String,
+    pub require_ssl: bool,
 }
 
 #[derive(serde::Deserialize)]
@@ -23,27 +26,24 @@ pub struct AppSettings {
 }
 
 impl DatabaseSettings {
-    pub fn get_connection_string(&self) -> Secret<String> {
-        format!(
-            "postgres://{}:{}@{}:{}/{}",
-            self.username.expose_secret(),
-            self.password.expose_secret(),
-            self.host,
-            self.port,
-            self.name
-        )
-        .into()
+    pub fn with_db(&self) -> PgConnectOptions {
+        let mut out = self.without_db().database(&self.name);
+        out.log_statements(tracing::log::LevelFilter::Trace);
+        out
     }
 
-    pub fn get_connection_string_no_db(&self) -> Secret<String> {
-        format!(
-            "postgres://{}:{}@{}:{}",
-            self.username.expose_secret(),
-            self.password.expose_secret(),
-            self.host,
-            self.port
-        )
-        .into()
+    pub fn without_db(&self) -> PgConnectOptions {
+        let ssl_mode = if self.require_ssl {
+            PgSslMode::Require
+        } else {
+            PgSslMode::Prefer
+        };
+        PgConnectOptions::new()
+            .host(&self.host)
+            .port(self.port.parse().unwrap())
+            .username(self.username.expose_secret())
+            .password(self.password.expose_secret())
+            .ssl_mode(ssl_mode)
     }
 }
 
@@ -62,6 +62,11 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
             config::FileFormat::Yaml,
         ))
         .add_source(config::File::new(&env_conf_fname, config::FileFormat::Yaml))
+        .add_source(
+            config::Environment::with_prefix("APP")
+                .prefix_separator("_")
+                .separator("__"),
+        )
         .build()?;
     //Try to convert config to application config type.
     settings.try_deserialize::<Settings>()

@@ -1,5 +1,4 @@
 use once_cell::sync::Lazy;
-use secrecy::ExposeSecret;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::net::TcpListener;
 use uuid::Uuid;
@@ -48,17 +47,16 @@ async fn spawn_app() -> TestApp {
 
 async fn configure_database(database: &DatabaseSettings) -> PgPool {
     // Acquire a temporary connection to the main database
-    let mut tmp_connection =
-        PgConnection::connect(&database.get_connection_string_no_db().expose_secret())
-            .await
-            .expect("Temporary connection to main pg database failed.");
+    let mut tmp_connection = PgConnection::connect_with(&database.without_db())
+        .await
+        .expect("Temporary connection to main pg database failed.");
     tmp_connection
         .execute(format!(r#"CREATE DATABASE "{}";"#, database.name).as_str())
         .await
         .expect("Failed to create database");
 
-    let conn_string = database.get_connection_string().expose_secret().to_owned();
-    let pool_out = PgPool::connect(&conn_string)
+    let conn = database.with_db();
+    let pool_out = PgPool::connect_with(conn)
         .await
         .expect("Database connection failed.");
 
