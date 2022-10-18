@@ -25,7 +25,11 @@ async fn subscribe_fails_on_empty_required_fields() {
             .expect("Failed to complete request.");
 
         // Assert
-        assert_eq!(400, response.status().as_u16(), "The app did not return 400 when the request was {}", description)
+        assert_eq!(
+            400,
+            response.status().as_u16(),
+            "The app did not return 400 when the request was {}",
+            description
+        )
     }
-
 }
