@@ -56,7 +56,7 @@ async fn db_insert_user(
         Uuid::new_v4(),
         //form.email,
         //form.name,
-        subscriber.email,
+        subscriber.email.as_ref(),
         subscriber.name.as_ref(),
         Utc::now()
     )
