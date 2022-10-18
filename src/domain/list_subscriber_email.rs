@@ -13,3 +13,5 @@ impl TryFrom<String> for ListSubscriberEmail {
         Ok(Self(s))
     }
 }
+
+// TODO: Unit tests
