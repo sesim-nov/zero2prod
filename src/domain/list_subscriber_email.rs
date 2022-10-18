@@ -15,3 +15,14 @@ impl TryFrom<String> for ListSubscriberEmail {
 }
 
 // TODO: Unit tests
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn creation_works() {
+        let email: String = "email@domain.test".into();
+        let user = ListSubscriberEmail::try_from(email.clone()).unwrap();
+        assert_eq!(user.as_ref(), email);
+    }
+}
