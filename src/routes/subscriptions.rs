@@ -22,17 +22,19 @@ pub async fn handle_subscribe(
     form: web::Form<FormData>,
     db_connection: web::Data<sqlx::PgPool>,
 ) -> impl Responder {
-    match ListSubscriber::try_new(form.name.clone(), form.email.clone()) {
-        Ok(user) => match db_insert_user(user, &db_connection).await {
-            Ok(_) => {
-                tracing::info!("Database modification successful!");
-                HttpResponse::Ok()
-            }
-            Err(e) => {
-                tracing::error!("Failed to execute query: {:?}", e);
-                HttpResponse::InternalServerError()
-            }
-        },
+    let user = match ListSubscriber::try_new(form.name.clone(), form.email.clone()) {
+        Ok(u) => u,
+        Err(e) => {
+            tracing::error!("Failed to parse new subscriber details: {:?}", e);
+            return HttpResponse::InternalServerError();
+        }
+    };
+
+    match db_insert_user(user, &db_connection).await {
+        Ok(_) => {
+            tracing::info!("Database modification successful!");
+            HttpResponse::Ok()
+        }
         Err(e) => {
             tracing::error!("Failed to execute query: {:?}", e);
             HttpResponse::InternalServerError()
