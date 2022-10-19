@@ -8,3 +8,5 @@ mod list_subscriber_email;
 mod list_subscriber_name;
 
 pub use list_subscriber::ListSubscriber;
+pub use list_subscriber_email::ListSubscriberEmail;
+pub use list_subscriber_name::ListSubscriberName;

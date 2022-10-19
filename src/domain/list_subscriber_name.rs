@@ -9,7 +9,7 @@ impl AsRef<str> for ListSubscriberName {
 }
 
 impl TryFrom<String> for ListSubscriberName {
-    type Error = &'static str;
+    type Error = String;
     fn try_from(s: String) -> Result<Self, Self::Error> {
         let is_blank = s.trim().is_empty();
         let is_too_long = s.graphemes(true).count() > 256;
@@ -18,7 +18,7 @@ impl TryFrom<String> for ListSubscriberName {
             s.chars().any(|c| bad_chars.contains(&c))
         };
         if is_blank || is_too_long || contains_bad_chars {
-            Err("Validation on Subscriber Name Failed!")
+            Err("Validation on Subscriber Name Failed!".into())
         } else {
             Ok(Self(s))
         }

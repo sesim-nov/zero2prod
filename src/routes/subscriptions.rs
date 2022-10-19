@@ -1,4 +1,4 @@
-use crate::domain::ListSubscriber;
+use crate::domain::{ListSubscriber, ListSubscriberEmail, ListSubscriberName};
 use actix_web::{web, HttpResponse, Responder};
 use chrono::Utc;
 use uuid::Uuid;
@@ -9,6 +9,14 @@ pub struct FormData {
     name: String,
 }
 
+impl TryFrom<FormData> for ListSubscriber {
+    type Error = String;
+    fn try_from(form: FormData) -> Result<Self, Self::Error> {
+        let name = ListSubscriberName::try_from(form.name)?;
+        let email = ListSubscriberEmail::try_from(form.email)?;
+        Ok(Self { name, email })
+    }
+}
 #[allow(clippy::async_yields_async)]
 #[tracing::instrument(
     name = "Adding new subscriber",
@@ -22,11 +30,11 @@ pub async fn handle_subscribe(
     form: web::Form<FormData>,
     db_connection: web::Data<sqlx::PgPool>,
 ) -> impl Responder {
-    let user = match ListSubscriber::try_new(form.name.clone(), form.email.clone()) {
+    let user = match form.0.try_into() {
         Ok(u) => u,
         Err(e) => {
             tracing::error!("Failed to parse new subscriber details: {:?}", e);
-            return HttpResponse::InternalServerError();
+            return HttpResponse::BadRequest();
         }
     };
 
