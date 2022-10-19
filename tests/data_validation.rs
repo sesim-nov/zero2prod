@@ -2,7 +2,6 @@ mod setup;
 use setup::spawn_app;
 
 #[tokio::test]
-#[ignore]
 async fn subscribe_fails_on_empty_required_fields() {
     // Arrange
     let bad_data = vec![
