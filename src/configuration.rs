@@ -1,3 +1,4 @@
+use crate::domain::ListSubscriberEmail;
 use secrecy::{ExposeSecret, Secret};
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
 use sqlx::ConnectOptions;
@@ -7,6 +8,19 @@ use sqlx::ConnectOptions;
 pub struct Settings {
     pub app: AppSettings,
     pub database: DatabaseSettings,
+    pub email_client: EmailClientSettings,
+}
+
+#[derive(serde::Deserialize)]
+pub struct EmailClientSettings {
+    pub base_url: String,
+    pub sender_string: String,
+}
+
+impl EmailClientSettings {
+    pub fn sender(&self) -> Result<ListSubscriberEmail, String> {
+        ListSubscriberEmail::try_from(self.sender_string.clone())
+    }
 }
 
 #[derive(serde::Deserialize)]

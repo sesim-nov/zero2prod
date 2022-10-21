@@ -1,4 +1,5 @@
 use crate::domain::ListSubscriberEmail;
+use reqwest::Client;
 
 pub struct EmailMessage {
     pub recipient: ListSubscriberEmail,
@@ -9,11 +10,17 @@ pub struct EmailMessage {
 
 pub struct EmailClient {
     sender: ListSubscriberEmail,
+    http_client: Client,
+    api_url: String,
 }
 
 impl EmailClient {
-    pub fn new(sender: ListSubscriberEmail) -> Self {
-        Self { sender }
+    pub fn new(sender: ListSubscriberEmail, api_url: String) -> Self {
+        Self {
+            sender,
+            http_client: Client::new(),
+            api_url,
+        }
     }
     pub fn get_sender(&self) -> &ListSubscriberEmail {
         &self.sender

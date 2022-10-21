@@ -1,6 +1,7 @@
 use sqlx::PgPool;
 use std::net::TcpListener;
 use zero2prod::configuration::get_configuration;
+use zero2prod::mail::EmailClient;
 use zero2prod::startup::run;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
@@ -14,5 +15,10 @@ async fn main() -> std::io::Result<()> {
     let db_connection = PgPool::connect_lazy_with(configuration.database.with_db());
     let address = format!("{}:{}", configuration.app.host, configuration.app.port);
     let listener = TcpListener::bind(address)?;
-    run(listener, db_connection)?.await
+    let sender = configuration
+        .email_client
+        .sender()
+        .expect("Failed to parse sender email");
+    let email_client = EmailClient::new(sender, configuration.email_client.base_url);
+    run(listener, db_connection, email_client)?.await
 }
