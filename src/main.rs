@@ -10,15 +10,24 @@ async fn main() -> std::io::Result<()> {
     // Tracer Setup
     let subscriber = get_subscriber("zero2prod".into(), "info".into(), std::io::stdout);
     init_subscriber(subscriber);
-
+    
+    // Configuration
     let configuration = get_configuration().expect("Failed to get configuration");
+
+    // SQL Database setup
     let db_connection = PgPool::connect_lazy_with(configuration.database.with_db());
+
+    // TCP Listener setup for App
     let address = format!("{}:{}", configuration.app.host, configuration.app.port);
     let listener = TcpListener::bind(address)?;
+
+    // Email Client Setup
     let sender = configuration
         .email_client
         .sender()
         .expect("Failed to parse sender email");
     let email_client = EmailClient::new(sender, configuration.email_client.base_url);
+
+    // FIRE!
     run(listener, db_connection, email_client)?.await
 }
