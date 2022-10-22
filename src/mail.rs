@@ -1,6 +1,6 @@
 //! Components related to sending e-mail traffic.
 use crate::domain::ListSubscriberEmail;
-use reqwest::Client;
+use reqwest::{Client, Response};
 
 /// Represents an e-mail message to be sent by an EmailClient.
 pub struct EmailMessage {
@@ -50,8 +50,10 @@ impl EmailClient {
     /// # Arguments
     ///
     /// * `message`: an EmailMessage representing the email to be sent.
-    pub async fn send_mail(&self, _message: EmailMessage) -> Result<(), String> {
-        todo!();
+    pub async fn send_mail(&self, message: EmailMessage) -> Result<Response, reqwest::Error> {
+        let client = &self.http_client;
+        let url = format!("{}/email", self.api_url);
+        client.post(url).body(message.body_text).send().await
     }
 }
 
