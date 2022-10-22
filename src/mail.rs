@@ -50,7 +50,43 @@ impl EmailClient {
     /// # Arguments
     ///
     /// * `message`: an EmailMessage representing the email to be sent.
-    pub async fn send_mail(_message: EmailMessage) -> Result<(), String> {
+    pub async fn send_mail(&self, _message: EmailMessage) -> Result<(), String> {
         todo!();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::domain::ListSubscriberEmail;
+    use crate::mail::{EmailClient, EmailMessage};
+    use fake::faker::internet::en::SafeEmail;
+    use fake::faker::lorem::en::{Paragraph, Sentence};
+    use fake::Fake;
+    use wiremock::{MockServer, Mock, ResponseTemplate};
+    use wiremock::matchers::any;
+    #[tokio::test]
+    async fn send_mail_targets_base_url() {
+        // Arrange
+        let mock_server = MockServer::start().await;
+        let sender = ListSubscriberEmail::try_from(SafeEmail().fake::<String>()).unwrap();
+        let email_client = EmailClient::new(sender, mock_server.uri());
+
+        let message_body: String = Paragraph(1..4).fake();
+        let message = EmailMessage{
+            recipient: ListSubscriberEmail::try_from(SafeEmail().fake::<String>()).unwrap(),
+            subject: Sentence(1..3).fake(),
+            body_text: message_body.clone(),
+            body_html: message_body
+        };
+
+        Mock::given(any())
+            .respond_with(ResponseTemplate::new(200))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        // Act
+        let _send_result = email_client.send_mail(message)
+            .await;
     }
 }

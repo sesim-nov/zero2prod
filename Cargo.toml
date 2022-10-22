@@ -46,3 +46,7 @@ features = [
 	"migrate",
 	"offline"
 ]
+
+[dev-dependencies]
+wiremock = "0.5"
+fake = "2.5"
