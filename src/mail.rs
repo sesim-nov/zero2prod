@@ -75,14 +75,14 @@ impl EmailClient {
 
 #[cfg(test)]
 mod tests {
+    use super::EmailApiRequest;
     use crate::domain::ListSubscriberEmail;
     use crate::mail::{EmailClient, EmailMessage};
     use fake::faker::internet::en::SafeEmail;
     use fake::faker::lorem::en::{Paragraph, Sentence};
     use fake::Fake;
-    use super::EmailApiRequest;
-    use wiremock::{MockServer, Mock, ResponseTemplate};
     use wiremock::matchers::body_json_schema;
+    use wiremock::{Mock, MockServer, ResponseTemplate};
     #[tokio::test]
     async fn send_mail_has_correct_schema() {
         // Arrange
@@ -91,11 +91,11 @@ mod tests {
         let email_client = EmailClient::new(sender, mock_server.uri());
 
         let message_body: String = Paragraph(1..4).fake();
-        let message = EmailMessage{
+        let message = EmailMessage {
             recipient: ListSubscriberEmail::try_from(SafeEmail().fake::<String>()).unwrap(),
             subject: Sentence(1..3).fake(),
             body_text: message_body.clone(),
-            body_html: message_body
+            body_html: message_body,
         };
 
         Mock::given(body_json_schema::<EmailApiRequest>)
@@ -105,7 +105,6 @@ mod tests {
             .await;
 
         // Act
-        let _send_result = email_client.send_mail(message)
-            .await;
+        let _send_result = email_client.send_mail(message).await;
     }
 }
