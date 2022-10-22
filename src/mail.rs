@@ -14,6 +14,15 @@ pub struct EmailMessage {
     pub body_html: String,
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct EmailApiRequest {
+    from: String,
+    to: String,
+    subject: String,
+    text_body: String,
+    html_body: String,
+}
 /// An Email Client
 ///
 /// This system is responsible for handling sending out email messages.
@@ -53,7 +62,14 @@ impl EmailClient {
     pub async fn send_mail(&self, message: EmailMessage) -> Result<Response, reqwest::Error> {
         let client = &self.http_client;
         let url = format!("{}/email", self.api_url);
-        client.post(url).body(message.body_text).send().await
+        let body = EmailApiRequest {
+            to: message.recipient.as_ref().to_owned(),
+            from: self.sender.as_ref().to_owned(),
+            subject: message.subject,
+            html_body: message.body_html,
+            text_body: message.body_text,
+        };
+        client.post(url).json(&body).send().await
     }
 }
 
@@ -64,10 +80,11 @@ mod tests {
     use fake::faker::internet::en::SafeEmail;
     use fake::faker::lorem::en::{Paragraph, Sentence};
     use fake::Fake;
+    use super::EmailApiRequest;
     use wiremock::{MockServer, Mock, ResponseTemplate};
-    use wiremock::matchers::any;
+    use wiremock::matchers::body_json_schema;
     #[tokio::test]
-    async fn send_mail_targets_base_url() {
+    async fn send_mail_has_correct_schema() {
         // Arrange
         let mock_server = MockServer::start().await;
         let sender = ListSubscriberEmail::try_from(SafeEmail().fake::<String>()).unwrap();
@@ -81,7 +98,7 @@ mod tests {
             body_html: message_body
         };
 
-        Mock::given(any())
+        Mock::given(body_json_schema::<EmailApiRequest>)
             .respond_with(ResponseTemplate::new(200))
             .expect(1)
             .mount(&mock_server)
