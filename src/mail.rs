@@ -91,7 +91,7 @@ mod tests {
     use fake::faker::lorem::en::{Paragraph, Sentence};
     use fake::Fake;
     use secrecy::Secret;
-    use wiremock::matchers::{body_json_schema, header, header_exists};
+    use wiremock::matchers::{body_json_schema, header, header_exists, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
     #[tokio::test]
     async fn send_mail_delivers_correct_request() {
@@ -110,6 +110,8 @@ mod tests {
         };
 
         Mock::given(body_json_schema::<EmailApiRequest>)
+            .and(path("/email"))
+            .and(method("POST"))
             .and(header_exists("X-Postmark-Server-Token"))
             .and(header("Content-Type", "application/json"))
             .respond_with(ResponseTemplate::new(200))
