@@ -78,7 +78,8 @@ impl EmailClient {
             .header("X-Postmark-Server-Token", self.auth_token.expose_secret())
             .json(&body)
             .send()
-            .await
+            .await?
+            .error_for_status()
     }
 }
 
@@ -91,8 +92,9 @@ mod tests {
     use fake::faker::lorem::en::{Paragraph, Sentence};
     use fake::Fake;
     use secrecy::Secret;
-    use wiremock::matchers::{body_json_schema, header, header_exists, method, path};
+    use wiremock::matchers::{any, body_json_schema, header, header_exists, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
+
     #[tokio::test]
     async fn send_mail_delivers_correct_request() {
         // Arrange
@@ -120,6 +122,34 @@ mod tests {
             .await;
 
         // Act
-        let _send_result = email_client.send_mail(message).await;
+        let send_result = email_client.send_mail(message).await;
+        assert!(send_result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn send_mail_returns_error_on_http_error() {
+        // Arrange
+        let mock_server = MockServer::start().await;
+        let sender = ListSubscriberEmail::try_from(SafeEmail().fake::<String>()).unwrap();
+        let token = Secret::new("token".into());
+        let email_client = EmailClient::new(sender, mock_server.uri(), token);
+
+        let message_body: String = Paragraph(1..4).fake();
+        let message = EmailMessage {
+            recipient: ListSubscriberEmail::try_from(SafeEmail().fake::<String>()).unwrap(),
+            subject: Sentence(1..3).fake(),
+            body_text: message_body.clone(),
+            body_html: message_body,
+        };
+
+        Mock::given(any())
+            .respond_with(ResponseTemplate::new(500))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        // Act
+        let send_result = email_client.send_mail(message).await;
+        assert!(send_result.is_err(), "Result was: {:?}", send_result);
     }
 }
