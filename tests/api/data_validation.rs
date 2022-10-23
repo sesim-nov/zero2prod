@@ -1,5 +1,4 @@
-mod setup;
-use setup::spawn_app;
+use crate::setup::spawn_app;
 
 #[tokio::test]
 async fn subscribe_fails_on_empty_required_fields() {

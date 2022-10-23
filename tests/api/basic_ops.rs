@@ -1,5 +1,4 @@
-mod setup;
-use setup::spawn_app;
+use crate::setup::spawn_app;
 
 #[tokio::test]
 async fn form_post_request_operates_correctly() {
