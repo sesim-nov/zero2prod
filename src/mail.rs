@@ -98,21 +98,29 @@ mod tests {
     use wiremock::matchers::{any, body_json_schema, header, header_exists, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
-    #[tokio::test]
-    async fn send_mail_delivers_correct_request() {
-        // Arrange
-        let mock_server = MockServer::start().await;
-        let sender = ListSubscriberEmail::try_from(SafeEmail().fake::<String>()).unwrap();
-        let token = Secret::new("token".into());
-        let email_client = EmailClient::new(sender, mock_server.uri(), token);
-
+    fn arrange_message() -> EmailMessage {
         let message_body: String = Paragraph(1..4).fake();
-        let message = EmailMessage {
+        EmailMessage {
             recipient: ListSubscriberEmail::try_from(SafeEmail().fake::<String>()).unwrap(),
             subject: Sentence(1..3).fake(),
             body_text: message_body.clone(),
             body_html: message_body,
-        };
+        }
+    }
+
+    fn get_token() -> Secret<String> {
+        Secret::new("token".into())
+    }
+
+    fn get_sender() -> ListSubscriberEmail {
+        ListSubscriberEmail::try_from(SafeEmail().fake::<String>()).unwrap()
+    }
+
+    #[tokio::test]
+    async fn send_mail_delivers_correct_request() {
+        // Arrange
+        let mock_server = MockServer::start().await;
+        let email_client = EmailClient::new(get_sender(), mock_server.uri(), get_token());
 
         Mock::given(body_json_schema::<EmailApiRequest>)
             .and(path("/email"))
@@ -125,7 +133,7 @@ mod tests {
             .await;
 
         // Act
-        let send_result = email_client.send_mail(message).await;
+        let send_result = email_client.send_mail(arrange_message()).await;
         assert!(send_result.is_ok());
     }
 
@@ -133,17 +141,7 @@ mod tests {
     async fn send_mail_returns_error_on_http_error() {
         // Arrange
         let mock_server = MockServer::start().await;
-        let sender = ListSubscriberEmail::try_from(SafeEmail().fake::<String>()).unwrap();
-        let token = Secret::new("token".into());
-        let email_client = EmailClient::new(sender, mock_server.uri(), token);
-
-        let message_body: String = Paragraph(1..4).fake();
-        let message = EmailMessage {
-            recipient: ListSubscriberEmail::try_from(SafeEmail().fake::<String>()).unwrap(),
-            subject: Sentence(1..3).fake(),
-            body_text: message_body.clone(),
-            body_html: message_body,
-        };
+        let email_client = EmailClient::new(get_sender(), mock_server.uri(), get_token());
 
         Mock::given(any())
             .respond_with(ResponseTemplate::new(500))
@@ -152,7 +150,7 @@ mod tests {
             .await;
 
         // Act
-        let send_result = email_client.send_mail(message).await;
+        let send_result = email_client.send_mail(arrange_message()).await;
         assert!(send_result.is_err(), "Result was: {:?}", send_result);
     }
 
@@ -160,17 +158,7 @@ mod tests {
     async fn send_mail_returns_error_on_timeout() {
         // Arrange
         let mock_server = MockServer::start().await;
-        let sender = ListSubscriberEmail::try_from(SafeEmail().fake::<String>()).unwrap();
-        let token = Secret::new("token".into());
-        let email_client = EmailClient::new(sender, mock_server.uri(), token);
-
-        let message_body: String = Paragraph(1..4).fake();
-        let message = EmailMessage {
-            recipient: ListSubscriberEmail::try_from(SafeEmail().fake::<String>()).unwrap(),
-            subject: Sentence(1..3).fake(),
-            body_text: message_body.clone(),
-            body_html: message_body,
-        };
+        let email_client = EmailClient::new(get_sender(), mock_server.uri(), get_token());
 
         Mock::given(any())
             .respond_with(ResponseTemplate::new(500).set_delay(std::time::Duration::from_secs(180)))
@@ -179,7 +167,7 @@ mod tests {
             .await;
 
         // Act
-        let send_result = email_client.send_mail(message).await;
+        let send_result = email_client.send_mail(arrange_message()).await;
         assert!(send_result.is_err(), "Result was: {:?}", send_result);
     }
 }
