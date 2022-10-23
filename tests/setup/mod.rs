@@ -42,7 +42,11 @@ pub async fn spawn_app() -> TestApp {
         .email_client
         .sender()
         .expect("Failed to parse sender email");
-    let email_client = EmailClient::new(sender, configuration.email_client.base_url);
+    let email_client = EmailClient::new(
+        sender,
+        configuration.email_client.base_url,
+        configuration.email_client.auth_token,
+    );
 
     // Spawn app
     let app = run(listener, db_connection.clone(), email_client).expect("Failed to spawn server");

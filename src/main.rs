@@ -26,7 +26,11 @@ async fn main() -> std::io::Result<()> {
         .email_client
         .sender()
         .expect("Failed to parse sender email");
-    let email_client = EmailClient::new(sender, configuration.email_client.base_url);
+    let email_client = EmailClient::new(
+        sender,
+        configuration.email_client.base_url,
+        configuration.email_client.auth_token,
+    );
 
     // FIRE!
     run(listener, db_connection, email_client)?.await

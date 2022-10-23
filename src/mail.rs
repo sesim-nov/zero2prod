@@ -1,6 +1,7 @@
 //! Components related to sending e-mail traffic.
 use crate::domain::ListSubscriberEmail;
 use reqwest::{Client, Response};
+use secrecy::{ExposeSecret, Secret};
 
 /// Represents an e-mail message to be sent by an EmailClient.
 pub struct EmailMessage {
@@ -34,6 +35,8 @@ pub struct EmailClient {
     http_client: Client,
     /// The base API url for the mail service used to send emails.
     api_url: String,
+    /// The API token used to authenticate with the mail application
+    auth_token: Secret<String>,
 }
 
 impl EmailClient {
@@ -43,11 +46,12 @@ impl EmailClient {
     ///
     /// * `sender` - a ListSubscriberEmail object representing the sender's address
     /// * `api_url` - a String representing the base API url used to send emails
-    pub fn new(sender: ListSubscriberEmail, api_url: String) -> Self {
+    pub fn new(sender: ListSubscriberEmail, api_url: String, auth_token: Secret<String>) -> Self {
         Self {
             sender,
             http_client: Client::new(),
             api_url,
+            auth_token,
         }
     }
     /// Expose the sender email address.
@@ -69,7 +73,12 @@ impl EmailClient {
             html_body: message.body_html,
             text_body: message.body_text,
         };
-        client.post(url).json(&body).send().await
+        client
+            .post(url)
+            .header("X-Postmark-Server-Token", self.auth_token.expose_secret())
+            .json(&body)
+            .send()
+            .await
     }
 }
 
@@ -81,14 +90,16 @@ mod tests {
     use fake::faker::internet::en::SafeEmail;
     use fake::faker::lorem::en::{Paragraph, Sentence};
     use fake::Fake;
-    use wiremock::matchers::body_json_schema;
+    use secrecy::Secret;
+    use wiremock::matchers::{body_json_schema, header_exists};
     use wiremock::{Mock, MockServer, ResponseTemplate};
     #[tokio::test]
-    async fn send_mail_has_correct_schema() {
+    async fn send_mail_delivers_correct_request() {
         // Arrange
         let mock_server = MockServer::start().await;
         let sender = ListSubscriberEmail::try_from(SafeEmail().fake::<String>()).unwrap();
-        let email_client = EmailClient::new(sender, mock_server.uri());
+        let token = Secret::new("token".into());
+        let email_client = EmailClient::new(sender, mock_server.uri(), token);
 
         let message_body: String = Paragraph(1..4).fake();
         let message = EmailMessage {
@@ -99,6 +110,7 @@ mod tests {
         };
 
         Mock::given(body_json_schema::<EmailApiRequest>)
+            .and(header_exists("X-Postmark-Server-Token"))
             .respond_with(ResponseTemplate::new(200))
             .expect(1)
             .mount(&mock_server)

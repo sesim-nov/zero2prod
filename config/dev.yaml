@@ -6,3 +6,4 @@ database:
 email_client:
   base_url: "https://api.postmark.com"
   sender_string: "cig@atamisk.net"
+  auth_token: "POSTMARK_API_TEST"
