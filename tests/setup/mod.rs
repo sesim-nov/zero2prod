@@ -42,10 +42,12 @@ pub async fn spawn_app() -> TestApp {
         .email_client
         .sender()
         .expect("Failed to parse sender email");
+    let timeout = configuration.email_client.timeout();
     let email_client = EmailClient::new(
         sender,
         configuration.email_client.base_url,
         configuration.email_client.auth_token,
+        timeout,
     );
 
     // Spawn app

@@ -2,6 +2,7 @@
 use crate::domain::ListSubscriberEmail;
 use reqwest::{Client, Response};
 use secrecy::{ExposeSecret, Secret};
+use std::time::Duration;
 
 /// Represents an e-mail message to be sent by an EmailClient.
 pub struct EmailMessage {
@@ -46,13 +47,17 @@ impl EmailClient {
     ///
     /// * `sender` - a ListSubscriberEmail object representing the sender's address
     /// * `api_url` - a String representing the base API url used to send emails
-    pub fn new(sender: ListSubscriberEmail, api_url: String, auth_token: Secret<String>) -> Self {
+    /// * `auth_token` - an API token for the mail REST interface.
+    /// * `timeout` - Request timeout.
+    pub fn new(
+        sender: ListSubscriberEmail,
+        api_url: String,
+        auth_token: Secret<String>,
+        timeout: Duration,
+    ) -> Self {
         Self {
             sender,
-            http_client: Client::builder()
-                .timeout(std::time::Duration::from_secs(10))
-                .build()
-                .unwrap(),
+            http_client: Client::builder().timeout(timeout).build().unwrap(),
             api_url,
             auth_token,
         }
@@ -95,6 +100,7 @@ mod tests {
     use fake::faker::lorem::en::{Paragraph, Sentence};
     use fake::Fake;
     use secrecy::Secret;
+    use std::time::Duration;
     use wiremock::matchers::{any, body_json_schema, header, header_exists, method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -120,7 +126,12 @@ mod tests {
     async fn send_mail_delivers_correct_request() {
         // Arrange
         let mock_server = MockServer::start().await;
-        let email_client = EmailClient::new(get_sender(), mock_server.uri(), get_token());
+        let email_client = EmailClient::new(
+            get_sender(),
+            mock_server.uri(),
+            get_token(),
+            Duration::from_secs(5),
+        );
 
         Mock::given(body_json_schema::<EmailApiRequest>)
             .and(path("/email"))
@@ -141,7 +152,12 @@ mod tests {
     async fn send_mail_returns_error_on_http_error() {
         // Arrange
         let mock_server = MockServer::start().await;
-        let email_client = EmailClient::new(get_sender(), mock_server.uri(), get_token());
+        let email_client = EmailClient::new(
+            get_sender(),
+            mock_server.uri(),
+            get_token(),
+            Duration::from_secs(5),
+        );
 
         Mock::given(any())
             .respond_with(ResponseTemplate::new(500))
@@ -158,7 +174,12 @@ mod tests {
     async fn send_mail_returns_error_on_timeout() {
         // Arrange
         let mock_server = MockServer::start().await;
-        let email_client = EmailClient::new(get_sender(), mock_server.uri(), get_token());
+        let email_client = EmailClient::new(
+            get_sender(),
+            mock_server.uri(),
+            get_token(),
+            Duration::from_millis(50),
+        );
 
         Mock::given(any())
             .respond_with(ResponseTemplate::new(500).set_delay(std::time::Duration::from_secs(180)))
