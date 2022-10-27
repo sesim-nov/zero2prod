@@ -22,27 +22,38 @@ pub struct TestApp {
     pub db_pool: PgPool,
 }
 
-#[tracing::instrument(name = "Spawning Test Server")]
-pub async fn spawn_app() -> TestApp {
-    // Setup Telemetry (once.)
-    Lazy::force(&SUBSCRIBER);
+impl TestApp {
+    #[tracing::instrument(name = "Spawning Test Server")]
+    pub async fn spawn_new() -> TestApp {
+        // Setup Telemetry (once.)
+        Lazy::force(&SUBSCRIBER);
 
-    // Read configuration
-    let mut configuration = get_configuration().expect("Failed to get Configuration");
-    configuration.database.name = Uuid::new_v4().to_string();
-    configuration.app.port = "0".into();
+        // Read configuration
+        let mut configuration = get_configuration().expect("Failed to get Configuration");
+        configuration.database.name = Uuid::new_v4().to_string();
+        configuration.app.port = "0".into();
 
-    let db_connection = configure_database(&configuration.database).await;
+        let db_connection = configure_database(&configuration.database).await;
 
-    // Spawn app
-    let app = AppInfo::new(configuration, db_connection.clone()).expect("Failed to build app");
-    let _ = tokio::spawn(app.server);
+        // Spawn app
+        let app = AppInfo::new(configuration, db_connection.clone()).expect("Failed to build app");
+        let _ = tokio::spawn(app.server);
 
-    tracing::info!("App Address: {}", app.app_address);
+        tracing::info!("App Address: {}", app.app_address);
 
-    TestApp {
-        app_address: app.app_address,
-        db_pool: db_connection,
+        TestApp {
+            app_address: app.app_address,
+            db_pool: db_connection,
+        }
+    }
+    pub async fn post_subscriptions(&self, body: String) -> reqwest::Response {
+        reqwest::Client::new()
+            .post(format!("{}/subscriptions", self.app_address))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(body)
+            .send()
+            .await
+            .expect("Sending request failed!")
     }
 }
 
