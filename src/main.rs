@@ -11,7 +11,7 @@ async fn main() -> std::io::Result<()> {
     // Configuration
     let configuration = get_configuration().expect("Failed to get configuration");
 
-    let server = build(configuration)?;
-    server.await?;
+    let app = build(configuration)?;
+    app.server.await?;
     Ok(())
 }
