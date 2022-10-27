@@ -2,7 +2,7 @@ use once_cell::sync::Lazy;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
 use zero2prod::configuration::{get_configuration, DatabaseSettings};
-use zero2prod::startup::build;
+use zero2prod::startup::AppInfo;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
 static SUBSCRIBER: Lazy<()> = Lazy::new(|| {
@@ -35,7 +35,7 @@ pub async fn spawn_app() -> TestApp {
     let db_connection = configure_database(&configuration.database).await;
 
     // Spawn app
-    let app = build(configuration, db_connection.clone()).expect("Failed to build app");
+    let app = AppInfo::new(configuration, db_connection.clone()).expect("Failed to build app");
     let _ = tokio::spawn(app.server);
 
     tracing::info!("App Address: {}", app.app_address);

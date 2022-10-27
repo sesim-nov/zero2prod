@@ -15,36 +15,38 @@ pub struct AppInfo {
     pub app_address: String,
 }
 
-pub fn build(configuration: Settings, db_connection: PgPool) -> std::io::Result<AppInfo> {
-    // TCP Listener setup for App
-    let address = format!("{}:{}", configuration.app.host, configuration.app.port);
-    let listener = TcpListener::bind(address)?;
-    let address = format!(
-        "http://{}:{}",
-        configuration.app.host,
-        listener.local_addr().unwrap().port()
-    );
+impl AppInfo {
+    pub fn new(configuration: Settings, db_connection: PgPool) -> std::io::Result<AppInfo> {
+        // TCP Listener setup for App
+        let address = format!("{}:{}", configuration.app.host, configuration.app.port);
+        let listener = TcpListener::bind(address)?;
+        let address = format!(
+            "http://{}:{}",
+            configuration.app.host,
+            listener.local_addr().unwrap().port()
+        );
 
-    // Email Client Setup
-    let sender = configuration
-        .email_client
-        .sender()
-        .expect("Failed to parse sender email");
-    let timeout = configuration.email_client.timeout();
-    let email_client = EmailClient::new(
-        sender,
-        configuration.email_client.base_url,
-        configuration.email_client.auth_token,
-        timeout,
-    );
+        // Email Client Setup
+        let sender = configuration
+            .email_client
+            .sender()
+            .expect("Failed to parse sender email");
+        let timeout = configuration.email_client.timeout();
+        let email_client = EmailClient::new(
+            sender,
+            configuration.email_client.base_url,
+            configuration.email_client.auth_token,
+            timeout,
+        );
 
-    // FIRE!
-    match run(listener, db_connection, email_client) {
-        Ok(srv) => Ok(AppInfo {
-            server: srv,
-            app_address: address,
-        }),
-        Err(e) => Err(e),
+        // FIRE!
+        match run(listener, db_connection, email_client) {
+            Ok(srv) => Ok(AppInfo {
+                server: srv,
+                app_address: address,
+            }),
+            Err(e) => Err(e),
+        }
     }
 }
 
