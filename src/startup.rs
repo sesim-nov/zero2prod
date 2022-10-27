@@ -13,17 +13,17 @@ pub struct AppInfo {
     pub server: Server,
     /// Connection address
     pub app_address: String,
-    /// Raw database pool
-    pub db_pool: PgPool,
 }
 
-pub fn build(configuration: Settings) -> std::io::Result<AppInfo> {
-    // SQL Database setup
-    let db_connection = PgPool::connect_lazy_with(configuration.database.with_db());
-
+pub fn build(configuration: Settings, db_connection: PgPool) -> std::io::Result<AppInfo> {
     // TCP Listener setup for App
     let address = format!("{}:{}", configuration.app.host, configuration.app.port);
-    let listener = TcpListener::bind(address.clone())?;
+    let listener = TcpListener::bind(address)?;
+    let address = format!(
+        "http://{}:{}",
+        configuration.app.host,
+        listener.local_addr().unwrap().port()
+    );
 
     // Email Client Setup
     let sender = configuration
@@ -39,11 +39,10 @@ pub fn build(configuration: Settings) -> std::io::Result<AppInfo> {
     );
 
     // FIRE!
-    match run(listener, db_connection.clone(), email_client) {
+    match run(listener, db_connection, email_client) {
         Ok(srv) => Ok(AppInfo {
             server: srv,
             app_address: address,
-            db_pool: db_connection,
         }),
         Err(e) => Err(e),
     }

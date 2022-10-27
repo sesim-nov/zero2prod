@@ -1,3 +1,4 @@
+use sqlx::PgPool;
 use zero2prod::configuration::get_configuration;
 use zero2prod::startup::build;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
@@ -10,8 +11,10 @@ async fn main() -> std::io::Result<()> {
 
     // Configuration
     let configuration = get_configuration().expect("Failed to get configuration");
+    // SQL Database setup
+    let db_connection = PgPool::connect_lazy_with(configuration.database.with_db());
 
-    let app = build(configuration)?;
+    let app = build(configuration, db_connection)?;
     app.server.await?;
     Ok(())
 }

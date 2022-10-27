@@ -1,10 +1,8 @@
 use once_cell::sync::Lazy;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
-use std::net::TcpListener;
 use uuid::Uuid;
 use zero2prod::configuration::{get_configuration, DatabaseSettings};
-use zero2prod::mail::EmailClient;
-use zero2prod::startup::run;
+use zero2prod::startup::build;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
 static SUBSCRIBER: Lazy<()> = Lazy::new(|| {
@@ -24,6 +22,7 @@ pub struct TestApp {
     pub db_pool: PgPool,
 }
 
+#[tracing::instrument(name = "Spawning Test Server")]
 pub async fn spawn_app() -> TestApp {
     // Setup Telemetry (once.)
     Lazy::force(&SUBSCRIBER);
@@ -31,30 +30,18 @@ pub async fn spawn_app() -> TestApp {
     // Read configuration
     let mut configuration = get_configuration().expect("Failed to get Configuration");
     configuration.database.name = Uuid::new_v4().to_string();
+    configuration.app.port = "0".into();
 
-    // Connect to db
     let db_connection = configure_database(&configuration.database).await;
-    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind test port");
-    let port = listener.local_addr().unwrap().port();
-
-    // Configure email client
-    let sender = configuration
-        .email_client
-        .sender()
-        .expect("Failed to parse sender email");
-    let timeout = configuration.email_client.timeout();
-    let email_client = EmailClient::new(
-        sender,
-        configuration.email_client.base_url,
-        configuration.email_client.auth_token,
-        timeout,
-    );
 
     // Spawn app
-    let app = run(listener, db_connection.clone(), email_client).expect("Failed to spawn server");
-    let _ = tokio::spawn(app);
+    let app = build(configuration, db_connection.clone()).expect("Failed to build app");
+    let _ = tokio::spawn(app.server);
+
+    tracing::info!("App Address: {}", app.app_address);
+
     TestApp {
-        app_address: format!("http://127.0.0.1:{}", port),
+        app_address: app.app_address,
         db_pool: db_connection,
     }
 }
