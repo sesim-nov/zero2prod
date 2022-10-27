@@ -1,5 +1,4 @@
-mod setup;
-use setup::spawn_app;
+use crate::setup::TestApp;
 
 #[tokio::test]
 async fn subscribe_fails_on_empty_required_fields() {
@@ -10,18 +9,11 @@ async fn subscribe_fails_on_empty_required_fields() {
         ("name=&email=", "all empty"),
     ];
 
-    let app = spawn_app().await;
-    let client = reqwest::Client::new();
+    let app = TestApp::spawn_new().await;
 
     for (payload, description) in bad_data {
         // Act
-        let response = client
-            .post(&format!("{}/subscriptions", app.app_address))
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .body(payload)
-            .send()
-            .await
-            .expect("Failed to complete request.");
+        let response = app.post_subscriptions(payload.into()).await;
 
         // Assert
         assert_eq!(

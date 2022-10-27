@@ -1,11 +1,10 @@
-mod setup;
-use setup::spawn_app;
+use crate::setup::TestApp;
 
 #[tokio::test]
 async fn health_check_works() {
     // Arrange
     // Spawn the web server.
-    let app = spawn_app().await;
+    let app = TestApp::spawn_new().await;
     // reqwest is needed to comunicate with the server we spawned.
     let client = reqwest::Client::new();
 

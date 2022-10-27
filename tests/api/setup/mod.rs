@@ -1,9 +1,8 @@
 use once_cell::sync::Lazy;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
-use std::net::TcpListener;
 use uuid::Uuid;
 use zero2prod::configuration::{get_configuration, DatabaseSettings};
-use zero2prod::startup::run;
+use zero2prod::startup::AppInfo;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
 
 static SUBSCRIBER: Lazy<()> = Lazy::new(|| {
@@ -23,25 +22,38 @@ pub struct TestApp {
     pub db_pool: PgPool,
 }
 
-pub async fn spawn_app() -> TestApp {
-    // Setup Telemetry (once.)
-    Lazy::force(&SUBSCRIBER);
+impl TestApp {
+    #[tracing::instrument(name = "Spawning Test Server")]
+    pub async fn spawn_new() -> TestApp {
+        // Setup Telemetry (once.)
+        Lazy::force(&SUBSCRIBER);
 
-    // Read configuration
-    let mut configuration = get_configuration().expect("Failed to get Configuration");
-    configuration.database.name = Uuid::new_v4().to_string();
+        // Read configuration
+        let mut configuration = get_configuration().expect("Failed to get Configuration");
+        configuration.database.name = Uuid::new_v4().to_string();
+        configuration.app.port = "0".into();
 
-    // Connect to db
-    let db_connection = configure_database(&configuration.database).await;
-    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind test port");
-    let port = listener.local_addr().unwrap().port();
+        let db_connection = configure_database(&configuration.database).await;
 
-    // Spawn app
-    let app = run(listener, db_connection.clone()).expect("Failed to spawn server");
-    let _ = tokio::spawn(app);
-    TestApp {
-        app_address: format!("http://127.0.0.1:{}", port),
-        db_pool: db_connection,
+        // Spawn app
+        let app = AppInfo::new(configuration, db_connection.clone()).expect("Failed to build app");
+        let _ = tokio::spawn(app.server);
+
+        tracing::info!("App Address: {}", app.app_address);
+
+        TestApp {
+            app_address: app.app_address,
+            db_pool: db_connection,
+        }
+    }
+    pub async fn post_subscriptions(&self, body: String) -> reqwest::Response {
+        reqwest::Client::new()
+            .post(format!("{}/subscriptions", self.app_address))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(body)
+            .send()
+            .await
+            .expect("Sending request failed!")
     }
 }
 

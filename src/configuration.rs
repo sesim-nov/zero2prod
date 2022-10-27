@@ -1,12 +1,32 @@
+use crate::domain::ListSubscriberEmail;
 use secrecy::{ExposeSecret, Secret};
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
 use sqlx::ConnectOptions;
+use std::time::Duration;
 
 #[allow(dead_code)]
 #[derive(serde::Deserialize)]
 pub struct Settings {
     pub app: AppSettings,
     pub database: DatabaseSettings,
+    pub email_client: EmailClientSettings,
+}
+
+#[derive(serde::Deserialize)]
+pub struct EmailClientSettings {
+    pub base_url: String,
+    pub sender_string: String,
+    pub auth_token: Secret<String>,
+    pub timeout_secs: u64,
+}
+
+impl EmailClientSettings {
+    pub fn sender(&self) -> Result<ListSubscriberEmail, String> {
+        ListSubscriberEmail::try_from(self.sender_string.clone())
+    }
+    pub fn timeout(&self) -> Duration {
+        Duration::from_secs(self.timeout_secs)
+    }
 }
 
 #[derive(serde::Deserialize)]

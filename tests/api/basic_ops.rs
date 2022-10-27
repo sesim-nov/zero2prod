@@ -1,21 +1,13 @@
-mod setup;
-use setup::spawn_app;
+use crate::setup::TestApp;
 
 #[tokio::test]
 async fn form_post_request_operates_correctly() {
     //Arrange
-    let app = spawn_app().await;
-    let client = reqwest::Client::new();
+    let app = TestApp::spawn_new().await;
 
     //Act
     let body = "name=Test%20User&email=test@example.com";
-    let response = client
-        .post(format!("{}/subscriptions", app.app_address))
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(body)
-        .send()
-        .await
-        .expect("Sending request failed!");
+    let response = app.post_subscriptions(body.into()).await;
     let record = sqlx::query!("SELECT email, name FROM subscriptions",)
         .fetch_one(&app.db_pool)
         .await
@@ -30,8 +22,7 @@ async fn form_post_request_operates_correctly() {
 #[tokio::test]
 async fn form_post_fails_correctly_with_missing_data() {
     //Arrange
-    let app = spawn_app().await;
-    let client = reqwest::Client::new();
+    let app = TestApp::spawn_new().await;
     let bad_requests = vec![
         ("email=test@example.com", "Missing Name"),
         ("name=Test%20User", "Missing Email"),
@@ -40,13 +31,7 @@ async fn form_post_fails_correctly_with_missing_data() {
 
     for (body, error_message) in bad_requests {
         //Act
-        let response = client
-            .post(format!("{}/subscriptions", app.app_address))
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .body(body)
-            .send()
-            .await
-            .expect("Sending request failed!");
+        let response = app.post_subscriptions(body.into()).await;
 
         //Assert
         assert_eq!(
