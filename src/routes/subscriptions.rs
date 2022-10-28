@@ -1,4 +1,5 @@
 use crate::domain::{ListSubscriber, ListSubscriberEmail, ListSubscriberName};
+use crate::mail::{EmailClient, EmailMessage};
 use actix_web::{web, HttpResponse, Responder};
 use chrono::Utc;
 use uuid::Uuid;
@@ -29,8 +30,9 @@ impl TryFrom<FormData> for ListSubscriber {
 pub async fn handle_subscribe(
     form: web::Form<FormData>,
     db_connection: web::Data<sqlx::PgPool>,
+    email_client: web::Data<EmailClient>,
 ) -> impl Responder {
-    let user = match form.0.try_into() {
+    let user: ListSubscriber = match form.0.try_into() {
         Ok(u) => u,
         Err(e) => {
             tracing::error!("Failed to parse new subscriber details: {:?}", e);
@@ -38,21 +40,38 @@ pub async fn handle_subscribe(
         }
     };
 
-    match db_insert_user(user, &db_connection).await {
+    match db_insert_user(&user, &db_connection).await {
         Ok(_) => {
             tracing::info!("Database modification successful!");
-            HttpResponse::Ok()
         }
         Err(e) => {
             tracing::error!("Failed to execute query: {:?}", e);
-            HttpResponse::InternalServerError()
+            return HttpResponse::InternalServerError();
         }
     }
+
+    let message = EmailMessage {
+        recipient: user.email,
+        subject: "Derp".into(),
+        body_text: "Welcome to my mailing list.".into(),
+        body_html: "Welcome to my list".into(),
+    };
+    match email_client.send_mail(message).await {
+        Ok(_) => {
+            tracing::info!("Email sent");
+        }
+        Err(e) => {
+            tracing::error!("Failed to send email. {:?}", e);
+            return HttpResponse::InternalServerError();
+        }
+    }
+
+    HttpResponse::Ok()
 }
 
 #[tracing::instrument(name = "Adding user to database", skip(subscriber, db_connection))]
 async fn db_insert_user(
-    subscriber: ListSubscriber,
+    subscriber: &ListSubscriber,
     db_connection: &sqlx::PgPool,
 ) -> Result<(), sqlx::Error> {
     // Query!

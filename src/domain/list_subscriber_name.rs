@@ -1,5 +1,6 @@
 use unicode_segmentation::UnicodeSegmentation;
 
+#[derive(Clone)]
 pub struct ListSubscriberName(String);
 
 impl AsRef<str> for ListSubscriberName {

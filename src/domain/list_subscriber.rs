@@ -1,6 +1,7 @@
 use crate::domain::list_subscriber_email::ListSubscriberEmail;
 use crate::domain::list_subscriber_name::ListSubscriberName;
 
+#[derive(Clone)]
 pub struct ListSubscriber {
     pub name: ListSubscriberName,
     pub email: ListSubscriberEmail,

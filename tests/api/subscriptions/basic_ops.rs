@@ -1,9 +1,17 @@
 use crate::setup::TestApp;
+use wiremock::matchers::{method, path};
+use wiremock::{Mock, ResponseTemplate};
 
 #[tokio::test]
 async fn form_post_request_operates_correctly() {
     //Arrange
     let app = TestApp::spawn_new().await;
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
 
     //Act
     let body = "name=Test%20User&email=test@example.com";
@@ -12,6 +20,7 @@ async fn form_post_request_operates_correctly() {
         .fetch_one(&app.db_pool)
         .await
         .expect("Failed to query database");
+
 
     //Assert
     assert_eq!(response.status().as_u16(), 200);
