@@ -21,7 +21,6 @@ async fn form_post_request_operates_correctly() {
         .await
         .expect("Failed to query database");
 
-
     //Assert
     assert_eq!(response.status().as_u16(), 200);
     assert_eq!(record.email, "test@example.com");
