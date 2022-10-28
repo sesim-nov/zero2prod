@@ -1,6 +1,7 @@
 use once_cell::sync::Lazy;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
+use wiremock::MockServer;
 use zero2prod::configuration::{get_configuration, DatabaseSettings};
 use zero2prod::startup::AppInfo;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
@@ -20,6 +21,7 @@ static SUBSCRIBER: Lazy<()> = Lazy::new(|| {
 pub struct TestApp {
     pub app_address: String,
     pub db_pool: PgPool,
+    pub email_server: MockServer,
 }
 
 impl TestApp {
@@ -28,22 +30,29 @@ impl TestApp {
         // Setup Telemetry (once.)
         Lazy::force(&SUBSCRIBER);
 
+        // Start mock email server
+        let email_server = MockServer::start().await;
+
         // Read configuration
-        let mut configuration = get_configuration().expect("Failed to get Configuration");
-        configuration.database.name = Uuid::new_v4().to_string();
-        configuration.app.port = "0".into();
+        let configuration = {
+            let mut c = get_configuration().expect("Failed to get Configuration");
+            c.database.name = Uuid::new_v4().to_string();
+            c.app.port = "0".into();
+            c.email_client.base_url = email_server.uri();
+            c
+        };
 
         let db_connection = configure_database(&configuration.database).await;
 
         // Spawn app
         let app = AppInfo::new(configuration, db_connection.clone()).expect("Failed to build app");
         let _ = tokio::spawn(app.server);
-
         tracing::info!("App Address: {}", app.app_address);
 
         TestApp {
             app_address: app.app_address,
             db_pool: db_connection,
+            email_server,
         }
     }
     pub async fn post_subscriptions(&self, body: String) -> reqwest::Response {
