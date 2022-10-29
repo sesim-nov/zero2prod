@@ -50,13 +50,7 @@ pub async fn handle_subscribe(
         }
     }
 
-    let message = EmailMessage {
-        recipient: user.email,
-        subject: "Derp".into(),
-        body_text: "Welcome to my mailing list.".into(),
-        body_html: "Welcome to my list".into(),
-    };
-    match email_client.send_mail(message).await {
+    match send_confirmation_email(email_client.get_ref(), user).await {
         Ok(_) => {
             tracing::info!("Email sent");
         }
@@ -67,6 +61,23 @@ pub async fn handle_subscribe(
     }
 
     HttpResponse::Ok()
+}
+
+/// Send a confirmation email
+#[tracing::instrument(name = "Sending confirmation email")]
+async fn send_confirmation_email(
+    email_client: &EmailClient,
+    user: ListSubscriber,
+) -> Result<reqwest::Response, reqwest::Error> {
+    let confirm_link = "https://my-api.com/subscriptions/confirm";
+    let message = EmailMessage {
+        recipient: user.email,
+        subject: "Derp".into(),
+        body_text: format!("Welcome to my mailing list. Link: {}", confirm_link).into(),
+        body_html: format!("Welcome to my list <a href={}>Link</a>", confirm_link).into(),
+    };
+
+    email_client.send_mail(message).await
 }
 
 #[tracing::instrument(name = "Adding user to database", skip(subscriber, db_connection))]
