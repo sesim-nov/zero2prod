@@ -73,13 +73,15 @@ async fn send_confirmation_email(
     let message = EmailMessage {
         recipient: user.email,
         subject: "Derp".into(),
-        body_text: format!("Welcome to my mailing list. Link: {}", confirm_link).into(),
-        body_html: format!("Welcome to my list <a href={}>Link</a>", confirm_link).into(),
+        body_text: format!("Welcome to my mailing list. Link: {}", confirm_link),
+        body_html: format!("Welcome to my list <a href={}>Link</a>", confirm_link),
     };
 
     email_client.send_mail(message).await
 }
 
+/// Insert a user into the database
+/// By default, the user is inserted as pending confirmation.
 #[tracing::instrument(name = "Adding user to database", skip(subscriber, db_connection))]
 async fn db_insert_user(
     subscriber: &ListSubscriber,
@@ -89,7 +91,7 @@ async fn db_insert_user(
     sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at, status)
-        VALUES ($1, $2, $3, $4, 'confirmed')
+        VALUES ($1, $2, $3, $4, 'pending')
         "#,
         Uuid::new_v4(),
         //form.email,

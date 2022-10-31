@@ -3,7 +3,7 @@ use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
 
 #[tokio::test]
-async fn form_post_request_operates_correctly() {
+async fn form_post_request_responds_200_on_good_data() {
     //Arrange
     let app = TestApp::spawn_new().await;
     Mock::given(path("/email"))
@@ -16,7 +16,25 @@ async fn form_post_request_operates_correctly() {
     //Act
     let body = "name=Test%20User&email=test@example.com";
     let response = app.post_subscriptions(body.into()).await;
-    let record = sqlx::query!("SELECT email, name FROM subscriptions",)
+
+    //Assert
+    assert_eq!(response.status().as_u16(), 200);
+}
+
+#[tokio::test]
+async fn subscriber_data_is_saved() {
+    //Arrange
+    let app = TestApp::spawn_new().await;
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&app.email_server)
+        .await;
+
+    //Act
+    let body = "name=Test%20User&email=test@example.com";
+    let response = app.post_subscriptions(body.into()).await;
+    let record = sqlx::query!("SELECT email, name, status FROM subscriptions",)
         .fetch_one(&app.db_pool)
         .await
         .expect("Failed to query database");
@@ -25,6 +43,7 @@ async fn form_post_request_operates_correctly() {
     assert_eq!(response.status().as_u16(), 200);
     assert_eq!(record.email, "test@example.com");
     assert_eq!(record.name, "Test User");
+    assert_eq!(record.status, "pending");
 }
 
 #[tokio::test]
