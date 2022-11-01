@@ -63,6 +63,7 @@ pub fn run(
             .route("/", web::get().to(greet))
             .route("/health_check", web::get().to(health_check))
             .route("/subscriptions", web::post().to(handle_subscribe))
+            .route("/subscriptions/confirm", web::get().to(handle_confirm))
             .route("/{name}", web::get().to(greet))
             .app_data(db_connection.clone())
             .app_data(email_client.clone())

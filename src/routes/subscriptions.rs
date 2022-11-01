@@ -4,6 +4,9 @@ use actix_web::{web, HttpResponse, Responder};
 use chrono::Utc;
 use uuid::Uuid;
 
+mod confirmation;
+pub use confirmation::*;
+
 #[derive(serde::Deserialize)]
 pub struct FormData {
     email: String,
