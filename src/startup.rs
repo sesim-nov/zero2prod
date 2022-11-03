@@ -18,11 +18,11 @@ pub struct AppInfo {
 impl AppInfo {
     pub fn new(configuration: Settings, db_connection: PgPool) -> std::io::Result<AppInfo> {
         // TCP Listener setup for App
-        let address = format!("{}:{}", configuration.app.host, configuration.app.port);
-        let listener = TcpListener::bind(address)?;
-        let address = format!(
-            "http://{}:{}",
-            configuration.app.host,
+        let listen_address = format!("{}:{}", configuration.app.host, configuration.app.port);
+        let listener = TcpListener::bind(listen_address)?;
+        let app_address = format!(
+            "{}:{}",
+            configuration.app.base_url,
             listener.local_addr().unwrap().port()
         );
 
@@ -43,7 +43,7 @@ impl AppInfo {
         match run(listener, db_connection, email_client) {
             Ok(srv) => Ok(AppInfo {
                 server: srv,
-                app_address: address,
+                app_address,
             }),
             Err(e) => Err(e),
         }
