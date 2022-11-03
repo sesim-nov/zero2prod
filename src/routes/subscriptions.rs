@@ -72,7 +72,7 @@ async fn send_confirmation_email(
     email_client: &EmailClient,
     user: ListSubscriber,
 ) -> Result<reqwest::Response, reqwest::Error> {
-    let confirm_link = "https://my-api.com/subscriptions/confirm";
+    let confirm_link = "https://my-api.com.badurl/subscriptions/confirm";
     let message = EmailMessage {
         recipient: user.email,
         subject: "Derp".into(),
