@@ -20,26 +20,12 @@ pub async fn extracted_link_from_confirm_email_returns_200() {
     let user_email: String = SafeEmail().fake();
     let payload = format!("name={}&email={}", user_name, user_email);
 
-    let get_link = |s: &str| -> String {
-        let links: Vec<_> = linkify::LinkFinder::new()
-            .links(s)
-            .filter(|l| *l.kind() == linkify::LinkKind::Url)
-            .collect();
-        assert_eq!(links.len(), 1);
-        links[0].as_str().to_owned()
-    };
-
     // Act
     let _response = app.post_subscriptions(payload.into()).await;
 
     let email_request = &app.email_server.received_requests().await.unwrap()[0];
 
-    let email_body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
-
-    let mut link =
-        reqwest::Url::parse(&get_link(email_body["HtmlBody"].as_str().unwrap())).unwrap();
-    link.set_port(Some(app.app_port.parse().unwrap())).unwrap();
-    let link: String = link.into();
+    let link = app.get_links(email_request).html;
 
     // Assert
     assert!(

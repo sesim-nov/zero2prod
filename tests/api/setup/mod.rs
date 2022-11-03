@@ -69,6 +69,36 @@ impl TestApp {
             .await
             .expect("Sending request failed!")
     }
+    pub fn get_links(&self, request: &wiremock::Request) -> ConfirmationLinks {
+        let get_link = |s: &str| -> String {
+            let links: Vec<_> = linkify::LinkFinder::new()
+                .links(s)
+                .filter(|l| *l.kind() == linkify::LinkKind::Url)
+                .collect();
+            assert_eq!(links.len(), 1);
+            links[0].as_str().to_owned()
+        };
+        let inject_port = |s: String| -> String {
+            let mut link =
+                reqwest::Url::parse(&s).unwrap();
+            link.set_port(Some(self.app_port.parse().unwrap())).unwrap();
+            link.into()
+        };
+        
+        let email_body: serde_json::Value = serde_json::from_slice(&request.body).unwrap();
+
+        let html = inject_port(get_link(email_body["HtmlBody"].as_str().unwrap()));
+        let plain_text = inject_port(get_link(email_body["TextBody"].as_str().unwrap()));
+        ConfirmationLinks{
+            plain_text,
+            html,
+        }
+    }
+}
+
+pub struct ConfirmationLinks {
+    pub plain_text: String, 
+    pub html: String,
 }
 
 async fn configure_database(database: &DatabaseSettings) -> PgPool {
