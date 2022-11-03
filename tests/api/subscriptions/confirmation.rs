@@ -15,11 +15,11 @@ pub async fn extracted_link_from_confirm_email_returns_200() {
         .expect(1)
         .mount(&app.email_server)
         .await;
-    
+
     let user_name: String = Name().fake();
     let user_email: String = SafeEmail().fake();
     let payload = format!("name={}&email={}", user_name, user_email);
-    
+
     let get_link = |s: &str| -> String {
         let links: Vec<_> = linkify::LinkFinder::new()
             .links(s)
@@ -29,10 +29,9 @@ pub async fn extracted_link_from_confirm_email_returns_200() {
         links[0].as_str().to_owned()
     };
 
-
     // Act
     let _response = app.post_subscriptions(payload.into()).await;
-    
+
     let email_request = &app.email_server.received_requests().await.unwrap()[0];
 
     let email_body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
@@ -40,7 +39,12 @@ pub async fn extracted_link_from_confirm_email_returns_200() {
     let html_link = get_link(email_body["HtmlBody"].as_str().unwrap());
 
     // Assert
-    assert!(html_link.contains(&app.app_address), "{} doesn't contain {}", html_link, app.app_address);
+    assert!(
+        html_link.contains(&app.app_address),
+        "{} doesn't contain {}",
+        html_link,
+        app.app_address
+    );
     let email_response = reqwest::get(html_link.clone()).await.unwrap();
 
     assert_eq!(200, email_response.status(), "{}", html_link);
