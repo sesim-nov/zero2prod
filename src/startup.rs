@@ -13,6 +13,8 @@ pub struct AppInfo {
     pub server: Server,
     /// Connection address
     pub app_address: String,
+    /// Connection port
+    pub app_port: String,
 }
 
 impl AppInfo {
@@ -20,11 +22,8 @@ impl AppInfo {
         // TCP Listener setup for App
         let listen_address = format!("{}:{}", configuration.app.host, configuration.app.port);
         let listener = TcpListener::bind(listen_address)?;
-        let app_address = format!(
-            "{}:{}",
-            configuration.app.base_url,
-            listener.local_addr().unwrap().port()
-        );
+        let app_address = configuration.app.base_url.clone();
+        let app_port = listener.local_addr().unwrap().port().to_string();
 
         // Email Client Setup
         let sender = configuration
@@ -40,23 +39,34 @@ impl AppInfo {
         );
 
         // FIRE!
-        match run(listener, db_connection, email_client) {
+        match run(
+            listener,
+            db_connection,
+            email_client,
+            configuration.app.base_url,
+        ) {
             Ok(srv) => Ok(AppInfo {
                 server: srv,
                 app_address,
+                app_port,
             }),
             Err(e) => Err(e),
         }
     }
 }
 
+#[derive(Debug)]
+pub struct AppBaseUrl(pub String);
+
 pub fn run(
     listener: TcpListener,
     db_connection: PgPool,
     email_client: EmailClient,
+    base_url: String,
 ) -> std::io::Result<Server> {
     let db_connection = web::Data::new(db_connection);
     let email_client = web::Data::new(email_client);
+    let base_url = web::Data::new(AppBaseUrl(base_url));
     let srv = HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
@@ -67,6 +77,7 @@ pub fn run(
             .route("/{name}", web::get().to(greet))
             .app_data(db_connection.clone())
             .app_data(email_client.clone())
+            .app_data(base_url.clone())
     })
     .listen(listener)?
     .run();

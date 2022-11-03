@@ -1,5 +1,6 @@
 use crate::domain::{ListSubscriber, ListSubscriberEmail, ListSubscriberName};
 use crate::mail::{EmailClient, EmailMessage};
+use crate::startup::AppBaseUrl;
 use actix_web::{web, HttpResponse, Responder};
 use chrono::Utc;
 use uuid::Uuid;
@@ -34,6 +35,7 @@ pub async fn handle_subscribe(
     form: web::Form<FormData>,
     db_connection: web::Data<sqlx::PgPool>,
     email_client: web::Data<EmailClient>,
+    base_url: web::Data<AppBaseUrl>,
 ) -> impl Responder {
     let user: ListSubscriber = match form.0.try_into() {
         Ok(u) => u,
@@ -53,7 +55,7 @@ pub async fn handle_subscribe(
         }
     }
 
-    match send_confirmation_email(email_client.get_ref(), user).await {
+    match send_confirmation_email(email_client.get_ref(), user, base_url.get_ref()).await {
         Ok(_) => {
             tracing::info!("Email sent");
         }
@@ -71,8 +73,9 @@ pub async fn handle_subscribe(
 async fn send_confirmation_email(
     email_client: &EmailClient,
     user: ListSubscriber,
+    base_url: &AppBaseUrl,
 ) -> Result<reqwest::Response, reqwest::Error> {
-    let confirm_link = "https://my-api.com.badurl/subscriptions/confirm";
+    let confirm_link = format!("{}/subscriptions/confirm?token=TODO", base_url.0);
     let message = EmailMessage {
         recipient: user.email,
         subject: "Derp".into(),

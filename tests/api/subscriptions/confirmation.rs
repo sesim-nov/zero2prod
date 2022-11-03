@@ -36,18 +36,21 @@ pub async fn extracted_link_from_confirm_email_returns_200() {
 
     let email_body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
 
-    let html_link = get_link(email_body["HtmlBody"].as_str().unwrap());
+    let mut link =
+        reqwest::Url::parse(&get_link(email_body["HtmlBody"].as_str().unwrap())).unwrap();
+    link.set_port(Some(app.app_port.parse().unwrap())).unwrap();
+    let link: String = link.into();
 
     // Assert
     assert!(
-        html_link.contains(&app.app_address),
+        link.contains(&app.app_address),
         "{} doesn't contain {}",
-        html_link,
+        link,
         app.app_address
     );
-    let email_response = reqwest::get(html_link.clone()).await.unwrap();
+    let email_response = reqwest::get(link.clone()).await.unwrap();
 
-    assert_eq!(200, email_response.status(), "{}", html_link);
+    assert_eq!(200, email_response.status(), "{}", link);
 }
 
 #[tokio::test]
@@ -59,8 +62,8 @@ pub async fn confirm_returns_200_with_valid_data() {
 
     // Act
     let response = reqwest::get(format!(
-        "{}/subscriptions/confirm?token={}",
-        app.app_address, token
+        "{}:{}/subscriptions/confirm?token={}",
+        app.app_address, app.app_port, token
     ))
     .await
     .unwrap();
@@ -75,9 +78,12 @@ pub async fn confirm_returns_400_with_no_token() {
     let app = TestApp::spawn_new().await;
 
     // Act
-    let response = reqwest::get(format!("{}/subscriptions/confirm", app.app_address))
-        .await
-        .unwrap();
+    let response = reqwest::get(format!(
+        "{}:{}/subscriptions/confirm",
+        app.app_address, app.app_port
+    ))
+    .await
+    .unwrap();
 
     // Assert
     assert_eq!(response.status().as_u16(), 400);

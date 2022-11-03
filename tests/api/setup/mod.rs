@@ -20,6 +20,7 @@ static SUBSCRIBER: Lazy<()> = Lazy::new(|| {
 
 pub struct TestApp {
     pub app_address: String,
+    pub app_port: String,
     pub db_pool: PgPool,
     pub email_server: MockServer,
 }
@@ -51,13 +52,17 @@ impl TestApp {
 
         TestApp {
             app_address: app.app_address,
+            app_port: app.app_port,
             db_pool: db_connection,
             email_server,
         }
     }
     pub async fn post_subscriptions(&self, body: String) -> reqwest::Response {
         reqwest::Client::new()
-            .post(format!("{}/subscriptions", self.app_address))
+            .post(format!(
+                "{}:{}/subscriptions",
+                self.app_address, self.app_port
+            ))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .body(body)
             .send()
