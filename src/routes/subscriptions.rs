@@ -46,8 +46,10 @@ pub async fn handle_subscribe(
             return HttpResponse::BadRequest();
         }
     };
+    
+    let subscriber_id = db_insert_user(&user, &db_connection).await;
 
-    match db_insert_user(&user, &db_connection).await {
+    match subscriber_id {
         Ok(_) => {
             tracing::info!("Database modification successful!");
         }
