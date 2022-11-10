@@ -8,6 +8,8 @@ use uuid::Uuid;
 mod confirmation;
 pub use confirmation::*;
 
+mod token;
+
 #[derive(serde::Deserialize)]
 pub struct FormData {
     email: String,
@@ -92,21 +94,20 @@ async fn send_confirmation_email(
 async fn db_insert_user(
     subscriber: &ListSubscriber,
     db_connection: &sqlx::PgPool,
-) -> Result<(), sqlx::Error> {
+) -> Result<Uuid, sqlx::Error> {
+    let subscriber_id = Uuid::new_v4();
     // Query!
     sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at, status)
         VALUES ($1, $2, $3, $4, 'pending')
         "#,
-        Uuid::new_v4(),
-        //form.email,
-        //form.name,
+        subscriber_id,
         subscriber.email.as_ref(),
         subscriber.name.as_ref(),
         Utc::now()
     )
     .execute(db_connection)
     .await?;
-    Ok(())
+    Ok(subscriber_id)
 }
