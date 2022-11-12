@@ -46,20 +46,30 @@ pub async fn handle_subscribe(
             return HttpResponse::BadRequest();
         }
     };
-    
-    let subscriber_id = db_insert_user(&user, &db_connection).await;
 
-    match subscriber_id {
-        Ok(_) => {
+    let subscriber_id = match db_insert_user(&user, &db_connection).await {
+        Ok(id) => {
             tracing::info!("Database modification successful!");
+            id
         }
         Err(e) => {
             tracing::error!("Failed to execute query: {:?}", e);
             return HttpResponse::InternalServerError();
         }
-    }
+    };
 
-    match send_confirmation_email(email_client.get_ref(), user, base_url.get_ref()).await {
+    let token = match token::insert_token_for_id(subscriber_id, &db_connection).await {
+        Ok(token) => {
+            tracing::info!("Token Generation successful!");
+            token
+        }
+        Err(e) => {
+            tracing::error!("Failed to execute query: {:?}", e);
+            return HttpResponse::InternalServerError();
+        }
+    };
+
+    match send_confirmation_email(email_client.get_ref(), user, token, base_url.get_ref()).await {
         Ok(_) => {
             tracing::info!("Email sent");
         }
@@ -77,9 +87,10 @@ pub async fn handle_subscribe(
 async fn send_confirmation_email(
     email_client: &EmailClient,
     user: ListSubscriber,
+    token: String,
     base_url: &AppBaseUrl,
 ) -> Result<reqwest::Response, reqwest::Error> {
-    let confirm_link = format!("{}/subscriptions/confirm?token=TODO", base_url.0);
+    let confirm_link = format!("{}/subscriptions/confirm?token={}", base_url.0, token);
     let message = EmailMessage {
         recipient: user.email,
         subject: "Derp".into(),
