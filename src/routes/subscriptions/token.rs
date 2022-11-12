@@ -1,6 +1,8 @@
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 
+/// Insert a randomly generated token for the given subscriber ID, then return the token to the
+/// caller.
 pub async fn insert_token_for_id(
     id: uuid::Uuid,
     pool: &sqlx::PgPool,
@@ -19,6 +21,24 @@ pub async fn insert_token_for_id(
     Ok(token)
 }
 
+/// Query the token table for an ID matching the provided token. Return ID to caller.
+pub async fn get_id_for_token(
+    token: String,
+    pool: &sqlx::PgPool,
+) -> Result<Option<uuid::Uuid>, sqlx::Error> {
+    let query_result = sqlx::query!(
+        r#"
+        SELECT subscriber_id FROM tokens
+        WHERE subscription_token = $1
+        "#,
+        token
+    )
+    .fetch_optional(pool)
+    .await?;
+    Ok(query_result.map(|a| a.subscriber_id))
+}
+
+/// Randomly generate a subscription token.
 fn generate_token() -> String {
     let rng = thread_rng();
     rng.sample_iter(Alphanumeric)
