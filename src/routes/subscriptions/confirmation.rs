@@ -1,4 +1,4 @@
-use crate::routes::subscriptions::token;
+use super::token;
 use actix_web::{web, HttpResponse, Responder};
 
 #[derive(serde::Deserialize)]
