@@ -39,6 +39,14 @@ pub async fn handle_subscribe(
     email_client: web::Data<EmailClient>,
     base_url: web::Data<AppBaseUrl>,
 ) -> impl Responder {
+    let mut txn = match db_connection.begin().await {
+        Ok(txn) => txn,
+        Err(_) => {
+            tracing::error!("Failed to start PG Transaction");
+            return HttpResponse::InternalServerError();
+        }
+    };
+
     let user: ListSubscriber = match form.0.try_into() {
         Ok(u) => u,
         Err(e) => {
@@ -47,7 +55,7 @@ pub async fn handle_subscribe(
         }
     };
 
-    let subscriber_id = match db_insert_user(&user, &db_connection).await {
+    let subscriber_id = match db_insert_user(&user, &mut txn).await {
         Ok(id) => {
             tracing::info!("Database modification successful!");
             id
@@ -58,7 +66,7 @@ pub async fn handle_subscribe(
         }
     };
 
-    let token = match token::insert_token_for_id(subscriber_id, &db_connection).await {
+    let token = match token::insert_token_for_id(subscriber_id, &mut txn).await {
         Ok(token) => {
             tracing::info!("Token Generation successful!");
             token
@@ -77,6 +85,11 @@ pub async fn handle_subscribe(
             tracing::error!("Failed to send email. {:?}", e);
             return HttpResponse::InternalServerError();
         }
+    }
+
+    if txn.commit().await.is_err() {
+        tracing::error!("Transaction failed to commit!!");
+        return HttpResponse::InternalServerError();
     }
 
     HttpResponse::Ok()
@@ -106,7 +119,7 @@ async fn send_confirmation_email(
 #[tracing::instrument(name = "Adding user to database", skip(subscriber, db_connection))]
 async fn db_insert_user(
     subscriber: &ListSubscriber,
-    db_connection: &sqlx::PgPool,
+    db_connection: &mut sqlx::Transaction<'_, sqlx::Postgres>,
 ) -> Result<Uuid, sqlx::Error> {
     let subscriber_id = Uuid::new_v4();
     // Query!

@@ -5,7 +5,7 @@ use rand::{thread_rng, Rng};
 /// caller.
 pub async fn insert_token_for_id(
     id: uuid::Uuid,
-    pool: &sqlx::PgPool,
+    pool: &mut sqlx::Transaction<'_, sqlx::Postgres>,
 ) -> Result<String, sqlx::Error> {
     let token = generate_token();
     sqlx::query!(
