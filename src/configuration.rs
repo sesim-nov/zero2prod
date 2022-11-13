@@ -43,6 +43,7 @@ pub struct DatabaseSettings {
 pub struct AppSettings {
     pub host: String,
     pub port: String,
+    pub base_url: String,
 }
 
 impl DatabaseSettings {

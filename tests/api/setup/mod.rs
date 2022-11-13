@@ -1,6 +1,7 @@
 use once_cell::sync::Lazy;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
+use wiremock::MockServer;
 use zero2prod::configuration::{get_configuration, DatabaseSettings};
 use zero2prod::startup::AppInfo;
 use zero2prod::telemetry::{get_subscriber, init_subscriber};
@@ -19,7 +20,9 @@ static SUBSCRIBER: Lazy<()> = Lazy::new(|| {
 
 pub struct TestApp {
     pub app_address: String,
+    pub app_port: String,
     pub db_pool: PgPool,
+    pub email_server: MockServer,
 }
 
 impl TestApp {
@@ -28,33 +31,70 @@ impl TestApp {
         // Setup Telemetry (once.)
         Lazy::force(&SUBSCRIBER);
 
+        // Start mock email server
+        let email_server = MockServer::start().await;
+
         // Read configuration
-        let mut configuration = get_configuration().expect("Failed to get Configuration");
-        configuration.database.name = Uuid::new_v4().to_string();
-        configuration.app.port = "0".into();
+        let configuration = {
+            let mut c = get_configuration().expect("Failed to get Configuration");
+            c.database.name = Uuid::new_v4().to_string();
+            c.app.port = "0".into();
+            c.email_client.base_url = email_server.uri();
+            c
+        };
 
         let db_connection = configure_database(&configuration.database).await;
 
         // Spawn app
         let app = AppInfo::new(configuration, db_connection.clone()).expect("Failed to build app");
         let _ = tokio::spawn(app.server);
-
         tracing::info!("App Address: {}", app.app_address);
 
         TestApp {
             app_address: app.app_address,
+            app_port: app.app_port,
             db_pool: db_connection,
+            email_server,
         }
     }
     pub async fn post_subscriptions(&self, body: String) -> reqwest::Response {
         reqwest::Client::new()
-            .post(format!("{}/subscriptions", self.app_address))
+            .post(format!(
+                "{}:{}/subscriptions",
+                self.app_address, self.app_port
+            ))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .body(body)
             .send()
             .await
             .expect("Sending request failed!")
     }
+    pub fn get_links(&self, request: &wiremock::Request) -> ConfirmationLinks {
+        let get_link = |s: &str| -> String {
+            let links: Vec<_> = linkify::LinkFinder::new()
+                .links(s)
+                .filter(|l| *l.kind() == linkify::LinkKind::Url)
+                .collect();
+            assert_eq!(links.len(), 1);
+            links[0].as_str().to_owned()
+        };
+        let inject_port = |s: String| -> String {
+            let mut link = reqwest::Url::parse(&s).unwrap();
+            link.set_port(Some(self.app_port.parse().unwrap())).unwrap();
+            link.into()
+        };
+
+        let email_body: serde_json::Value = serde_json::from_slice(&request.body).unwrap();
+
+        let html = inject_port(get_link(email_body["HtmlBody"].as_str().unwrap()));
+        let plain_text = inject_port(get_link(email_body["TextBody"].as_str().unwrap()));
+        ConfirmationLinks { plain_text, html }
+    }
+}
+
+pub struct ConfirmationLinks {
+    pub plain_text: String,
+    pub html: String,
 }
 
 async fn configure_database(database: &DatabaseSettings) -> PgPool {

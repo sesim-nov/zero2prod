@@ -29,6 +29,7 @@ struct EmailApiRequest {
 ///
 /// This system is responsible for handling sending out email messages.
 ///
+#[derive(Debug)]
 pub struct EmailClient {
     /// The email used as the "From" address on emails being sent.
     sender: ListSubscriberEmail,

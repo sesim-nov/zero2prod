@@ -1,3 +1,4 @@
+#[derive(Debug, Clone)]
 pub struct ListSubscriberEmail(String);
 
 impl AsRef<str> for ListSubscriberEmail {

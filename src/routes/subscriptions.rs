@@ -1,7 +1,14 @@
 use crate::domain::{ListSubscriber, ListSubscriberEmail, ListSubscriberName};
+use crate::mail::{EmailClient, EmailMessage};
+use crate::startup::AppBaseUrl;
 use actix_web::{web, HttpResponse, Responder};
 use chrono::Utc;
 use uuid::Uuid;
+
+mod confirmation;
+pub use confirmation::*;
+
+mod token;
 
 #[derive(serde::Deserialize)]
 pub struct FormData {
@@ -29,8 +36,18 @@ impl TryFrom<FormData> for ListSubscriber {
 pub async fn handle_subscribe(
     form: web::Form<FormData>,
     db_connection: web::Data<sqlx::PgPool>,
+    email_client: web::Data<EmailClient>,
+    base_url: web::Data<AppBaseUrl>,
 ) -> impl Responder {
-    let user = match form.0.try_into() {
+    let mut txn = match db_connection.begin().await {
+        Ok(txn) => txn,
+        Err(_) => {
+            tracing::error!("Failed to start PG Transaction");
+            return HttpResponse::InternalServerError();
+        }
+    };
+
+    let user: ListSubscriber = match form.0.try_into() {
         Ok(u) => u,
         Err(e) => {
             tracing::error!("Failed to parse new subscriber details: {:?}", e);
@@ -38,37 +55,85 @@ pub async fn handle_subscribe(
         }
     };
 
-    match db_insert_user(user, &db_connection).await {
-        Ok(_) => {
+    let subscriber_id = match db_insert_user(&user, &mut txn).await {
+        Ok(id) => {
             tracing::info!("Database modification successful!");
-            HttpResponse::Ok()
+            id
         }
         Err(e) => {
             tracing::error!("Failed to execute query: {:?}", e);
-            HttpResponse::InternalServerError()
+            return HttpResponse::InternalServerError();
+        }
+    };
+
+    let token = match token::insert_token_for_id(subscriber_id, &mut txn).await {
+        Ok(token) => {
+            tracing::info!("Token Generation successful!");
+            token
+        }
+        Err(e) => {
+            tracing::error!("Failed to execute query: {:?}", e);
+            return HttpResponse::InternalServerError();
+        }
+    };
+
+    match send_confirmation_email(email_client.get_ref(), user, token, base_url.get_ref()).await {
+        Ok(_) => {
+            tracing::info!("Email sent");
+        }
+        Err(e) => {
+            tracing::error!("Failed to send email. {:?}", e);
+            return HttpResponse::InternalServerError();
         }
     }
+
+    if txn.commit().await.is_err() {
+        tracing::error!("Transaction failed to commit!!");
+        return HttpResponse::InternalServerError();
+    }
+
+    HttpResponse::Ok()
 }
 
+/// Send a confirmation email
+#[tracing::instrument(name = "Sending confirmation email")]
+async fn send_confirmation_email(
+    email_client: &EmailClient,
+    user: ListSubscriber,
+    token: String,
+    base_url: &AppBaseUrl,
+) -> Result<reqwest::Response, reqwest::Error> {
+    let confirm_link = format!("{}/subscriptions/confirm?token={}", base_url.0, token);
+    let message = EmailMessage {
+        recipient: user.email,
+        subject: "Derp".into(),
+        body_text: format!("Welcome to my mailing list. Link: {}", confirm_link),
+        body_html: format!("Welcome to my list <a href={}>Link</a>", confirm_link),
+    };
+
+    email_client.send_mail(message).await
+}
+
+/// Insert a user into the database
+/// By default, the user is inserted as pending confirmation.
 #[tracing::instrument(name = "Adding user to database", skip(subscriber, db_connection))]
 async fn db_insert_user(
-    subscriber: ListSubscriber,
-    db_connection: &sqlx::PgPool,
-) -> Result<(), sqlx::Error> {
+    subscriber: &ListSubscriber,
+    db_connection: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+) -> Result<Uuid, sqlx::Error> {
+    let subscriber_id = Uuid::new_v4();
     // Query!
     sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at, status)
-        VALUES ($1, $2, $3, $4, 'confirmed')
+        VALUES ($1, $2, $3, $4, 'pending')
         "#,
-        Uuid::new_v4(),
-        //form.email,
-        //form.name,
+        subscriber_id,
         subscriber.email.as_ref(),
         subscriber.name.as_ref(),
         Utc::now()
     )
     .execute(db_connection)
     .await?;
-    Ok(())
+    Ok(subscriber_id)
 }

@@ -10,7 +10,7 @@ async fn health_check_works() {
 
     // Act
     let response = client
-        .get(format!("{}/health_check", app.app_address))
+        .get(format!("{}:{}/health_check", app.app_address, app.app_port))
         .send()
         .await
         .expect("Request failed to execute.");
