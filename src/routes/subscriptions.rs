@@ -24,6 +24,7 @@ impl TryFrom<FormData> for ListSubscriber {
         Ok(Self { name, email })
     }
 }
+
 #[allow(clippy::async_yields_async)]
 #[tracing::instrument(
     name = "Adding new subscriber",
@@ -39,14 +40,6 @@ pub async fn handle_subscribe(
     email_client: web::Data<EmailClient>,
     base_url: web::Data<AppBaseUrl>,
 ) -> impl Responder {
-    let mut txn = match db_connection.begin().await {
-        Ok(txn) => txn,
-        Err(_) => {
-            tracing::error!("Failed to start PG Transaction");
-            return HttpResponse::InternalServerError();
-        }
-    };
-
     let user: ListSubscriber = match form.0.try_into() {
         Ok(u) => u,
         Err(e) => {
@@ -55,25 +48,11 @@ pub async fn handle_subscribe(
         }
     };
 
-    let subscriber_id = match db_insert_user(&user, &mut txn).await {
-        Ok(id) => {
-            tracing::info!("Database modification successful!");
-            id
-        }
+    let token = match add_new_pending_user(&user, &db_connection).await {
+        Ok(token) => token,
         Err(e) => {
-            tracing::error!("Failed to execute query: {:?}", e);
-            return HttpResponse::InternalServerError();
-        }
-    };
-
-    let token = match token::insert_token_for_id(subscriber_id, &mut txn).await {
-        Ok(token) => {
-            tracing::info!("Token Generation successful!");
-            token
-        }
-        Err(e) => {
-            tracing::error!("Failed to execute query: {:?}", e);
-            return HttpResponse::InternalServerError();
+            tracing::error!("Adding new user failed!");
+            return e;
         }
     };
 
@@ -85,11 +64,6 @@ pub async fn handle_subscribe(
             tracing::error!("Failed to send email. {:?}", e);
             return HttpResponse::InternalServerError();
         }
-    }
-
-    if txn.commit().await.is_err() {
-        tracing::error!("Transaction failed to commit!!");
-        return HttpResponse::InternalServerError();
     }
 
     HttpResponse::Ok()
@@ -112,6 +86,49 @@ async fn send_confirmation_email(
     };
 
     email_client.send_mail(message).await
+}
+
+/// Add a new user, registering a new user ID and token within the database.
+async fn add_new_pending_user(
+    user: &ListSubscriber,
+    db_connection: &sqlx::PgPool,
+) -> Result<String, actix_web::HttpResponseBuilder> {
+    let mut txn = match db_connection.begin().await {
+        Ok(txn) => txn,
+        Err(_) => {
+            tracing::error!("Failed to start PG Transaction");
+            return Err(HttpResponse::InternalServerError());
+        }
+    };
+
+    let subscriber_id = match db_insert_user(user, &mut txn).await {
+        Ok(id) => {
+            tracing::info!("Database modification successful!");
+            id
+        }
+        Err(e) => {
+            tracing::error!("Failed to execute query: {:?}", e);
+            return Err(HttpResponse::InternalServerError());
+        }
+    };
+
+    let token = match token::insert_token_for_id(subscriber_id, &mut txn).await {
+        Ok(token) => {
+            tracing::info!("Token Generation successful!");
+            token
+        }
+        Err(e) => {
+            tracing::error!("Failed to execute query: {:?}", e);
+            return Err(HttpResponse::InternalServerError());
+        }
+    };
+
+    if txn.commit().await.is_err() {
+        tracing::error!("Transaction failed to commit!!");
+        return Err(HttpResponse::InternalServerError());
+    }
+
+    Ok(token)
 }
 
 /// Insert a user into the database

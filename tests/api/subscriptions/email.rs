@@ -70,4 +70,3 @@ pub async fn subscribing_twice_sends_dual_emails() {
         assert_eq!(response.status(), 200);
     }
 }
-
