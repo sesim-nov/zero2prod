@@ -48,12 +48,22 @@ pub async fn handle_subscribe(
         }
     };
 
-    let token = match add_new_pending_user(&user, &db_connection).await {
-        Ok(token) => token,
-        Err(e) => {
-            tracing::error!("Adding new user failed!");
-            return e;
+    let existing_token = match get_token_for_email(&user, &db_connection).await {
+        Ok(opt) => opt,
+        Err(_) => {
+            tracing::error!("Querying DB Failed!");
+            return HttpResponse::InternalServerError();
         }
+    };
+    let token = match existing_token {
+        Some(old_tkn) => old_tkn,
+        None => match add_new_pending_user(&user, &db_connection).await {
+            Ok(new_token) => new_token,
+            Err(e) => {
+                tracing::error!("Adding new user failed!");
+                return e;
+            }
+        },
     };
 
     match send_confirmation_email(email_client.get_ref(), user, token, base_url.get_ref()).await {
@@ -86,6 +96,27 @@ async fn send_confirmation_email(
     };
 
     email_client.send_mail(message).await
+}
+
+/// Attempt to find an existing user.
+async fn get_token_for_email(
+    user: &ListSubscriber,
+    db_connection: &sqlx::PgPool,
+) -> Result<Option<String>, sqlx::Error> {
+    let response = sqlx::query!(
+        r#"
+        SELECT id FROM subscriptions
+        WHERE email = $1
+        "#,
+        user.email.as_ref(),
+    )
+    .fetch_optional(db_connection)
+    .await?;
+    if let Some(id) = response.map(|a| a.id) {
+        Ok(token::get_token_for_id(id, db_connection).await?)
+    } else {
+        Ok(None)
+    }
 }
 
 /// Add a new user, registering a new user ID and token within the database.

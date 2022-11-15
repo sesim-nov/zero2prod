@@ -21,6 +21,23 @@ pub async fn insert_token_for_id(
     Ok(token)
 }
 
+/// Query the token table for a token matching the provided ID. Return token to caller.
+pub async fn get_token_for_id(
+    id: uuid::Uuid,
+    pool: &sqlx::PgPool,
+) -> Result<Option<String>, sqlx::Error> {
+    let query_result = sqlx::query!(
+        r#"
+        SELECT subscription_token FROM tokens
+        WHERE subscriber_id = $1
+        "#,
+        id
+    )
+    .fetch_optional(pool)
+    .await?;
+    Ok(query_result.map(|a| a.subscription_token))
+}
+
 /// Query the token table for an ID matching the provided token. Return ID to caller.
 pub async fn get_id_for_token(
     token: String,
