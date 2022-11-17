@@ -2,6 +2,8 @@ use crate::setup::TestApp;
 use fake::faker::internet::en::SafeEmail;
 use fake::faker::name::en::Name;
 use fake::Fake;
+use rand::distributions::Alphanumeric;
+use rand::Rng;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
 
@@ -78,6 +80,29 @@ pub async fn clicking_email_link_twice_yields_correct_db_entry() {
     assert_eq!(saved.email, user_email);
     assert_eq!(saved.name, user_name);
     assert_eq!(saved.status, "confirmed");
+}
+
+#[tokio::test]
+pub async fn bad_access_token_fails_gracefully() {
+    // Arrange
+    let app = TestApp::spawn_new().await;
+    let rng = rand::thread_rng();
+    let bad_token: String = rng
+        .sample_iter(Alphanumeric)
+        .map(char::from)
+        .take(25)
+        .collect();
+
+    // Act
+    let response = reqwest::get(format!(
+        "{}:{}/subscriptions/confirm?token={}",
+        app.app_address, app.app_port, bad_token
+    ))
+    .await
+    .unwrap();
+
+    // Assert
+    assert_eq!(response.status().as_u16(), 401);
 }
 
 #[tokio::test]
