@@ -20,6 +20,26 @@
     },
     "query": "\n        SELECT subscriber_id FROM tokens\n        WHERE subscription_token = $1\n        "
   },
+  "485a1262e4891b3b936d17faeb7602b12f6965ebbbbab3a17e14dbe8392b3dc3": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Uuid"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "\n        SELECT id FROM subscriptions\n        WHERE email = $1\n        "
+  },
   "5546aa15409e3a017e9c32ba3278458baa8e125954f791a4a1bf8dacac443ebe": {
     "describe": {
       "columns": [],
@@ -59,5 +79,25 @@
       }
     },
     "query": "\n        UPDATE subscriptions SET status = 'confirmed' WHERE id = $1\n        "
+  },
+  "b864b50be2ea50250e65b54bada2fcf803544fa2e7a119ea63aa1541125554c8": {
+    "describe": {
+      "columns": [
+        {
+          "name": "subscription_token",
+          "ordinal": 0,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      }
+    },
+    "query": "\n        SELECT subscription_token FROM tokens\n        WHERE subscriber_id = $1\n        "
   }
 }
