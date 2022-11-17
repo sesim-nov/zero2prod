@@ -19,7 +19,10 @@ pub async fn handle_confirm(
 ) -> impl Responder {
     let id = match token::get_id_for_token(query.token.clone(), &pool).await {
         Ok(id) => id,
-        Err(_) => return HttpResponse::InternalServerError(),
+        Err(_) => {
+            tracing::error!("Getting ID for token failed!");
+            return HttpResponse::InternalServerError();
+        }
     };
 
     let id = match id {
