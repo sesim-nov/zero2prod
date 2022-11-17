@@ -41,6 +41,46 @@ pub async fn clicking_email_link_confirms_subscriber() {
 }
 
 #[tokio::test]
+pub async fn clicking_email_link_twice_yields_correct_db_entry() {
+    // Arrange
+    let app = TestApp::spawn_new().await;
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+    let user_name: String = Name().fake();
+    let user_email: String = SafeEmail().fake();
+    let payload = format!("name={}&email={}", user_name, user_email);
+
+    let _response = app.post_subscriptions(payload.clone()).await;
+    let email_request = &app.email_server.received_requests().await.unwrap()[0];
+    let link = app.get_links(email_request).html;
+
+    // Act
+    reqwest::get(link.clone())
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap();
+    reqwest::get(link)
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap();
+
+    // Assert
+    let saved = sqlx::query!("SELECT email, name, status FROM subscriptions")
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to run query");
+    assert_eq!(saved.email, user_email);
+    assert_eq!(saved.name, user_name);
+    assert_eq!(saved.status, "confirmed");
+}
+
+#[tokio::test]
 pub async fn extracted_link_from_confirm_email_returns_200() {
     // Arrange
     let app = TestApp::spawn_new().await;
